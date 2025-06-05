@@ -25,3 +25,7 @@ conf.yaml
 # coverage report
 coverage.xml
 coverage/
+
+
+# luojiapeng
+.vscode/
