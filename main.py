@@ -116,7 +116,7 @@ def main(
 if __name__ == "__main__":
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Run the Deer")
-    parser.add_argument("query", nargs="*", help="The query to process")
+    parser.add_argument("--query", nargs="*", help="The query to process")
     parser.add_argument("--file", nargs="*", help="The query to process")
     parser.add_argument(
         "--interactive",
@@ -163,7 +163,7 @@ if __name__ == "__main__":
         # Run the agent workflow with the provided parameters
         ask(
             question=user_query,
-            files=args.files,
+            files=args.file,
             debug=args.debug,
             max_plan_iterations=args.max_plan_iterations,
             max_step_num=args.max_step_num,

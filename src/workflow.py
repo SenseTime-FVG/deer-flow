@@ -125,12 +125,11 @@ async def run_agent_workflow_async(
             "max_step_num": max_step_num,
             "mcp_settings": {
                 "servers": {
-                    "mcp-github-trending": {
-                        "transport": "stdio",
-                        "command": "uvx",
-                        "args": ["mcp-github-trending"],
-                        "enabled_tools": ["get_github_trending_repositories"],
-                        "add_to_agents": ["researcher"],
+                    "doc_parser": {
+                        "transport": "sse",
+                        "url": "http://127.0.0.1:8010/sse",
+                        "enabled_tools": ["parse_doc"],
+                        "add_to_agents": ["researcher", "coder"]
                     }
                 }
             },

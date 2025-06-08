@@ -10,7 +10,8 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langgraph.types import Command, interrupt
-from langchain_mcp_adapters.client import MultiServerMCPClient
+# from langchain_mcp_adapters.client import MultiServerMCPClient
+from src.mcp_client.mcp_client import MultiServerMCPClient_wFileUpload
 
 from src.agents import create_agent
 from src.tools.search import LoggedTavilySearch
@@ -462,7 +463,7 @@ async def _setup_and_execute_agent_step(
 
     # Create and execute agent with MCP tools if available
     if mcp_servers:
-        async with MultiServerMCPClient(mcp_servers) as client:
+        async with MultiServerMCPClient_wFileUpload(mcp_servers) as client:
             loaded_tools = default_tools[:]
             for tool in client.get_tools():
                 if tool.name in enabled_tools:
@@ -470,6 +471,7 @@ async def _setup_and_execute_agent_step(
                         f"Powered by '{enabled_tools[tool.name]}'.\n{tool.description}"
                     )
                     loaded_tools.append(tool)
+            logger.info(f'agent_type={agent_type}, loaded_tools={loaded_tools}')
             agent = create_agent(agent_type, agent_type, loaded_tools, agent_type)
             return await _execute_agent_step(state, agent, agent_type)
     else:
