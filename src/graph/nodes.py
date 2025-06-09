@@ -463,7 +463,7 @@ async def _setup_and_execute_agent_step(
 
     # Create and execute agent with MCP tools if available
     if mcp_servers:
-        async with MultiServerMCPClient_wFileUpload(mcp_servers) as client:
+        async with MultiServerMCPClient_wFileUpload(mcp_servers, state) as client:
             loaded_tools = default_tools[:]
             for tool in client.get_tools():
                 if tool.name in enabled_tools:

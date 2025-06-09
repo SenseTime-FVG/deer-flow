@@ -1,15 +1,18 @@
-
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from mcp import ClientSession
 from langchain_mcp_adapters.tools import load_mcp_tools
 from langchain_core.tools import BaseTool
 from langchain_mcp_adapters.tools import NonTextContent
+from src.graph.types import State, Resource
 from typing import Any
 import os.path as osp
-
+import uuid
+import json
+import re
 import base64
 import filetype
 import logging
+import traceback
 logger = logging.getLogger(__name__)
 
 def file_to_data_uri(file_path):
@@ -26,22 +29,38 @@ def file_to_data_uri(file_path):
     mime_base64 = f"data:{mime_type};base64,{base64_content}"
     return mime_base64
 
-def add_file_upload_in_tool(tool: BaseTool):
-    old_coroutine = tool.coroutine
+
+def base64_to_bytes(base64_str: str) -> bytes:
+    """
+    将Base64编码的字符串（可能带有data:前缀）转换为bytes对象
+    参数: base64_str: Base64编码的字符串，可能带有类似"data:image/png;base64,"的前缀
+    返回: 解码后的bytes对象
+    """
+    # 检查是否包含"base64,"前缀，并提取Base64部分
+    if "base64," in base64_str:
+        # 使用 split 提取 base64, 后面的部分
+        try:
+            base64_data = base64_str.split("base64,")[1]
+        except IndexError:
+            raise ValueError("无效的Base64 data URI格式")
+    else:
+        base64_data = base64_str
     
-    async def wrapped_call_tool(
-        **arguments: dict[str, Any],
-    ) -> tuple[str | list[str], list[NonTextContent] | None]:
-        for k in list(arguments.keys()):
-            if 'uri' == k.lower() and osp.exists(arguments[k]):
-                arguments[k] = file_to_data_uri(arguments[k])
-        out = await old_coroutine(**arguments)
-        return out
+    # 移除可能的空白字符（如换行符、空格）
+    base64_data = base64_data.strip()
     
-    tool.coroutine = wrapped_call_tool
-    return tool
+    try:
+        return base64.b64decode(base64_data)
+    except base64.binascii.Error as e:
+        raise ValueError("无效的Base64编码") from e
+
+
 
 class MultiServerMCPClient_wFileUpload(MultiServerMCPClient):
+    def __init__(self, connections, state: State):
+        super().__init__(connections)
+        self.state = state
+
     async def _initialize_session_and_load_tools(
         self, server_name: str, session: ClientSession
     ) -> None:
@@ -57,5 +76,104 @@ class MultiServerMCPClient_wFileUpload(MultiServerMCPClient):
 
         # Load tools from this server
         server_tools = await load_mcp_tools(session)
-        server_tools = [add_file_upload_in_tool(tool) for tool in server_tools]
+        server_tools = [self._add_file_upload_in_tool(tool) for tool in server_tools]
         self.server_name_to_tools[server_name] = server_tools
+    
+    # def _add_file_upload_in_tool(self,tool: BaseTool):
+    #     old_coroutine = tool.coroutine
+
+    #     def _recursive_replace_uri_with_file(out):
+    #         logger.info(f"recursive_replace_uri_with_file before load, {type(out)}")
+    #         if isinstance(out, str):
+    #             try:
+    #                 logger.info(f"recursive_replace_uri_with_file in json.load")
+    #                 parsed = json.loads(out)
+    #                 processed = _recursive_replace_uri_with_file(parsed)
+    #                 return json.dumps(processed, ensure_ascii=False)
+    #             except Exception as e:
+    #                 logger.info(f"recursive_replace_uri_with_file in json.load error, {e}")
+
+    #             if out.startswith('data:') and 'base64' in out:
+    #                 logger.info(f"recursive_replace_uri_with_file processing base64 content")
+    #                 out_bytes = base64_to_bytes(out)
+    #                 file_name = f"{uuid.uuid4().hex[:8]}.{filetype.guess(out_bytes).extension}"
+    #                 file_path = osp.join(self.state['session_dir'], file_name)
+    #                 with open(file_path, 'wb') as file:
+    #                     file.write(out_bytes)
+    #                 self.state['resources'].append(Resource(
+    #                     uri=file_path,
+    #                     title=file_path,
+    #                     description=file_path))
+    #                 return file_path
+    #             else:
+    #                 return out
+    #         elif isinstance(out, dict):
+    #             for k, v in out.items():
+    #                 out[k] = _recursive_replace_uri_with_file(v)
+    #         elif isinstance(out, list):
+    #             out = [_recursive_replace_uri_with_file(item) for item in out]
+    #         elif isinstance(out, tuple):
+    #             out = tuple([_recursive_replace_uri_with_file(item) for item in out])
+    #         elif out is None:
+    #             pass
+    #         else:
+    #             logger.error(f"recursive_replace_uri_with_file error, {type(out)}")
+    #             raise ValueError(f"recursive_replace_uri_with_file error, {type(out)}")
+    #         return out
+    def _add_file_upload_in_tool(self, tool: BaseTool):
+        old_coroutine = tool.coroutine
+
+        def _replace_base64_with_path(out):
+            # todo: 有潜在bug，如果模型输出内容就是有base64编码的内容，则会被替换为文件路径
+            # 需要针对特定返回格式的json string进行处理
+            # todo: 如果返回内容中有两个相同的文件？
+            if isinstance(out, str):
+                # 用正则表达式匹配out中的base64编码的uri，并替换为文件路径
+                pattern = r'data:[^;]+;base64,[A-Za-z0-9+/=]+'
+                matches = re.findall(pattern, out)
+                for match in matches:
+                    b64_string = match
+                    # 使用filetype库猜测文件类型，并使用uuid生成文件名
+                    data_bytes = base64_to_bytes(b64_string)
+                    file_name = f"{uuid.uuid4().hex[:8]}.{filetype.guess(data_bytes).extension}"
+                    file_path = osp.join(self.state['session_dir'], file_name)
+                    with open(file_path, 'wb') as file:
+                        file.write(data_bytes)
+                    self.state['resources'].append(Resource(
+                        uri=file_path,
+                        title=file_path,
+                        description=file_path))
+                    out = out.replace(b64_string, file_path)
+                return out
+            elif isinstance(out, dict):
+                for k, v in out.items():
+                    out[k] = _replace_base64_with_path(v)
+                return out
+            elif isinstance(out, list):
+                return [_replace_base64_with_path(item) for item in out]
+            elif isinstance(out, tuple):
+                return tuple([_replace_base64_with_path(item) for item in out])
+            elif out is None:
+                return out
+            else:
+                logger.error(f"recursive_replace_uri_with_file error, {type(out)}")
+                raise ValueError(f"recursive_replace_uri_with_file error, {type(out)}")
+        
+        async def wrapped_call_tool(
+            **arguments: dict[str, Any],
+        ) -> tuple[str | list[str], list[NonTextContent] | None]:
+            for k in list(arguments.keys()):
+                if 'uri' == k.lower() and osp.exists(arguments[k]):
+                    arguments[k] = file_to_data_uri(arguments[k])
+            out = await old_coroutine(**arguments)
+            try:
+                out = _replace_base64_with_path(out)
+            except Exception as e:
+                logger.error(f"recursive_replace_uri_with_file error, {e}")
+                logger.error(traceback.format_exc())
+                raise e
+            logger.info(f"wrapped_call_tool out: {out}")
+            return out
+        
+        tool.coroutine = wrapped_call_tool
+        return tool

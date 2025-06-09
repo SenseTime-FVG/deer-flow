@@ -28,10 +28,10 @@ def extract_base64_images(input_string):
     for match in matches:
         alt_text, content_type, b64_string = match
         image_info = {
-            'type': 'file_base64',
+            'type': 'uri',
             'alt_text': alt_text,
             'content_type': content_type,
-            'file_base64': b64_string
+            'uri': b64_string
         }
         result_list.append(image_info)
 
