@@ -23,17 +23,4 @@ class State(MessagesState):
     session_id: str = None
     session_dir: str = None
 
-    # Agent interaction fields
-    coder_request: dict = None
-    coder_response: str = None
-
-    research_request: dict = None
-    research_response: str = None
-
-    reader_request: dict = None
-    reader_response: str = None
-
-    analyzer_iteration: int = 0
-
-    delegation_source: str = None
-    temp_analysis_result: dict = None
+    current_step_index: int = -1

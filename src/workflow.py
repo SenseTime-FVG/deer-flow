@@ -88,17 +88,6 @@ def get_init_state(
         "enable_background_investigation": enable_background_investigation,
         "session_id": session_id,
         "session_dir": session_dir,
-
-        # Initialize agent interaction fields
-        "coder_request": None,
-        "coder_response": None,
-        "research_request": None,
-        "research_response": None,
-        "reader_request": None,
-        "reader_response": None,
-        "analyzer_iteration": 0,
-        "delegation_source": None,
-        "temp_analysis_result": None,
     }
 
 
