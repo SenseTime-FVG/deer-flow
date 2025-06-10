@@ -1,6 +1,7 @@
 import json
 from copy import deepcopy
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ def file2resource(file: str) -> dict:
     logger.warning(f'file title and description not implemented, use filename as title and description')
     return {
         'uri': file,
-        'title': file,
+        'title': os.path.basename(file),
         'description': file
     }
 

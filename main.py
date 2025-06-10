@@ -169,3 +169,5 @@ if __name__ == "__main__":
             max_step_num=args.max_step_num,
             enable_background_investigation=args.enable_background_investigation,
         )
+
+# uv run main.py --query "使用analyzer中的docparse工具看文件中2025-04-01的加班时长,plan只需要一个step" --file /mnt/afs/yaotiankuo/agents/deer-dev/tests/加班清单.xlsx

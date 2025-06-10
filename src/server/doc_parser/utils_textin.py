@@ -140,8 +140,8 @@ async def textin_parsing_doc(uri: str) -> str:
         if item_type == 'image':
             # 处理图片类型
             converted_results.append({
-                'type': 'file_base64',
-                'file_base64': format_data_uri(item['base64str'])
+                'type': 'uri',
+                'uri': format_data_uri(item['base64str'])
             })
         elif item_type in ['paragraph', 'table']:
             # 处理段落和表格类型

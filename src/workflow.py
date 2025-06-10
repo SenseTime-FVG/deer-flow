@@ -80,6 +80,7 @@ def get_init_state(
 
     else:
         raise ValueError("Invalid user input type")
+    
     return {
         "messages": [{"role": "user", "content": user_input_text}],
         "resources": resources,
@@ -87,9 +88,19 @@ def get_init_state(
         "enable_background_investigation": enable_background_investigation,
         "session_id": session_id,
         "session_dir": session_dir,
+
+        # Initialize agent interaction fields
+        "coder_request": None,
+        "coder_response": None,
+        "research_request": None,
+        "research_response": None,
+        "reader_request": None,
+        "reader_response": None,
+        "analyzer_iteration": 0,
+        "delegation_source": None,
+        "temp_analysis_result": None,
     }
-    
-    
+
 
 async def run_agent_workflow_async(
     user_input: str | list[dict],
@@ -118,18 +129,21 @@ async def run_agent_workflow_async(
 
     logger.info(f"Starting async workflow with user input: {user_input}")
     initial_state = get_init_state(user_input, enable_background_investigation)
+
+
     config = {
         "configurable": {
             "thread_id": "default",
             "max_plan_iterations": max_plan_iterations,
             "max_step_num": max_step_num,
+            "max_search_results": 5,
             "mcp_settings": {
                 "servers": {
                     "doc_parser": {
                         "transport": "sse",
                         "url": "http://127.0.0.1:8010/sse",
                         "enabled_tools": ["parse_doc"],
-                        "add_to_agents": ["researcher", "coder"]
+                        "add_to_agents": ["analyzer"]
                     }
                 }
             },
