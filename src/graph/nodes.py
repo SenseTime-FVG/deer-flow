@@ -50,9 +50,6 @@ AGENT_LLM_MAP: dict[str, LLMType] = {
     "reporter": "basic",
 }
 
-
-
-
 @tool
 def handoff_to_planner(
     task_title: Annotated[str, "The title of the task to be handed off."],
@@ -60,6 +57,7 @@ def handoff_to_planner(
 ):
     """Handoff to planner agent to do plan."""
     return
+
 @tool
 def call_coder_agent(
     analysis_request: Annotated[str, "Specific coding request for the coder"]
@@ -87,6 +85,7 @@ def call_researcher_agent(
     """
 
     return f"Will delegate to researcher: {research_request}"
+
 @tool
 def call_reader_agent(
     reader_request: Annotated[str, "Specific image reading process"],
@@ -96,7 +95,7 @@ def call_reader_agent(
     Delegate task to reader agent For image understanding and vision question answering. 
     Parameters:
         reader_request: str, Specific image readerode task description
-        file_info: Image file path need reading
+        file_info: Image file path need reading, If multiple images need to be read, input them in the following format: file_path1,file_path2,file_path3
     Returns:
         str, The result of image reading
         """
@@ -294,13 +293,14 @@ async def analyzer_node(
     # # 运行测试
     # test_result = test_direct_tool_call()
 
-    logger.info("Analyzer node is coordinating task execution.")
+    
     configurable = Configuration.from_runnable_config(config)
     # print(state)
     current_plan = state.get("current_plan")
     current_step_index = state.get("current_step_index", 0)
     current_step = current_plan.steps[current_step_index]
-    
+
+    logger.info(f"Analyzer node working: current_step:{current_step}")
     # 构建analyzer输入（只使用前一个agent传递的message）
     analyzer_input = {
         "messages": [
@@ -313,7 +313,7 @@ async def analyzer_node(
     }
     
     messages = apply_prompt_template("analyzer", analyzer_input, configurable)
-    print(f"analyzer{current_step_index}: \n{messages[1].content}")
+    # print(f"analyzer{current_step_index}: \n{messages[1].content}")
     # 准备委托工具
 
     delegation_tools = [call_coder_agent, call_researcher_agent, call_reader_agent]
@@ -339,12 +339,12 @@ async def analyzer_node(
     async with MultiServerMCPClient_wFileUpload(mcp_servers, state=state) as client:
         for tool in client.get_tools():
             mcp_tools.append(tool)
-        print(f"mcp_tools: {mcp_tools}")
+        # print(f"mcp_tools: {mcp_tools}")
             
         all_tools = delegation_tools + mcp_tools
         llm = get_llm_by_type(AGENT_LLM_MAP["analyzer"]).bind_tools(all_tools)
         response = llm.invoke(messages)
-        print(response)
+        # print(response)
         # 检查tool call
         if hasattr(response, 'tool_calls') and response.tool_calls:
             delegation_calls = []
@@ -411,7 +411,7 @@ async def analyzer_node(
                         goto="router"
                     )
                 elif tool_call["name"] == "call_reader_agent":
-                    print(tool_call)
+                    # print(tool_call)
                     # 插入reader步骤
                     reader_request = tool_call['args']['reader_request']
                     file_info = tool_call['args']['file_info']
@@ -445,13 +445,14 @@ async def coder_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["router"]]:
     """编程节点 - 处理编程任务"""
-    logger.info("Coder node is executing coding task.")
+    
     configurable = Configuration.from_runnable_config(config)
     
     current_plan = state.get("current_plan")
     current_step_index = state.get("current_step_index", 0)
     current_step = current_plan.steps[current_step_index]
-    
+    logger.info(f"Coder node is executing coding task. current_step: {current_step}")
+
     # 构建coder输入（只使用前一个agent传递的message）
     coder_input = {
         "messages": [
@@ -464,7 +465,7 @@ async def coder_node(
     }
     
     messages = apply_prompt_template("coder", coder_input, configurable)
-    print(f"code: \n{messages}")
+    # print(f"code: \n{messages}")
     # 创建coder agent
     coder_agent = create_agent("coder", "coder", [python_repl_tool], "coder")
     
@@ -490,13 +491,13 @@ async def researcher_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["router"]]:
     """研究员节点 - 处理研究任务"""
-    logger.info("Researcher node is executing research task.")
     configurable = Configuration.from_runnable_config(config)
     
     current_plan = state.get("current_plan")
     current_step_index = state.get("current_step_index", 0)
     current_step = current_plan.steps[current_step_index]
-    
+    logger.info(f"Researcher node is executing research task. current_step: {current_step}")
+
     # 构建researcher输入（只使用前一个agent传递的message）
     researcher_input = {
         "messages": [
@@ -509,7 +510,7 @@ async def researcher_node(
     }
     
     messages = apply_prompt_template("researcher", researcher_input, configurable)
-    print(f"research: \n{messages}")
+    # print(f"research: \n{messages}")
     # 准备研究工具
     tools = [get_web_search_tool(configurable.max_search_results), crawl_tool]
     retriever_tool = get_retriever_tool(state.get("resources", []))
@@ -556,34 +557,43 @@ async def researcher_node(
         goto="router"
     )
 
-def create_message_with_base64_image(text: str, image_path: str) -> HumanMessage:
+def create_message_with_base64_image(text: str, image_paths: str) -> HumanMessage:
     """使用base64编码传递图像, 都转为jpg再转为base64传输"""
-    
-    with Image.open(image_path) as img:
-        # 转换为RGB模式（去除透明通道）
-        if img.mode in ('RGBA', 'LA', 'P'):
-            img = img.convert('RGB')
-        
-        # 保存为JPEG格式到内存
-        buffer = io.BytesIO()
-        img.save(buffer, format='JPEG', quality=85)
-        buffer.seek(0)
-        # 编码为base64
-        base64_image = base64.b64encode(buffer.getvalue()).decode('utf-8')
 
+    # image_paths: path1,path2,path3
+    image_paths_list = image_paths.split(",")
+    base64_image_list = []
+    for image_path in image_paths_list:
+        with Image.open(image_path) as img:
+            # 转换为RGB模式（去除透明通道）
+            if img.mode in ('RGBA', 'LA', 'P'):
+                img = img.convert('RGB')
+            
+            # 保存为JPEG格式到内存
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG', quality=85)
+            buffer.seek(0)
+            # 编码为base64
+            base64_image = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            base64_image_list.append(base64_image)
+
+    image_messages = [
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/jpeg;base64,{i}"
+            }
+        }
+        for i in base64_image_list
+    ]
     # 创建多模态content
     content = [
         {
             "type": "text",
             "text": text
-        },
-        {
-            "type": "image_url",
-            "image_url": {
-                "url": f"data:image/jpeg;base64,{base64_image}"
-            }
         }
     ]
+    content.extend(image_messages)
     
     return HumanMessage(content=content)
 
@@ -591,25 +601,25 @@ async def reader_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["router"]]:
     """读取器节点 - 处理文档读取任务"""
-    logger.info("Reader node is processing document content.")
+    
     configurable = Configuration.from_runnable_config(config)
     
     current_plan = state.get("current_plan")
     current_step_index = state.get("current_step_index", 0)
     current_step = current_plan.steps[current_step_index]
-    
+    logger.info(f"Reader node is reading image. current_step: {current_step}")
     # 构建reader输入（只使用前一个agent传递的message）
     reader_input = {
         "messages": [create_message_with_base64_image(
                 text=f"# Current Task\n\n## Title\n{current_step.title}\n\n## Description\n{current_step.description}\n\n## Previous Message\n{state.get('messages', [])[-1].content if state.get('messages') else 'No previous message'}\n\n## Locale\n{state.get('locale', 'en-US')}", 
-                image_path=state.get("file_info", "")
+                image_paths=state.get("file_info", "")
             )],
         "locale": state.get("locale", "en-US"),
         "resources": state.get("resources", [])
     }
     
     messages = apply_prompt_template("reader", reader_input, configurable)
-    print(f"reader: \n{messages}")
+    # print(f"reader: \n{messages}")
     # 使用vision模型处理文档和图片
     llm = get_llm_by_type(AGENT_LLM_MAP["reader"])
     response = llm.invoke(messages)
@@ -628,13 +638,14 @@ def thinker_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["router"]]:
     """思考器节点 - 使用推理模型，能够深度思考问题"""
-    logger.info("Thinker node is processing complex reasoning task.")
+    
     configurable = Configuration.from_runnable_config(config)
     
     current_plan = state.get("current_plan")
     current_step_index = state.get("current_step_index", 0)
     current_step = current_plan.steps[current_step_index]
-    
+    logger.info(f"Thinker node is processing complex reasoning task. current_step: {current_step}")
+
     # 构建thinker输入（只使用前一个agent传递的message）
     thinker_input = {
         "messages": [
@@ -647,12 +658,12 @@ def thinker_node(
     }
     
     messages = apply_prompt_template("thinker", thinker_input, configurable)
-    print(f"thinker: \n{messages}")
+    # print(f"thinker: \n{messages}")
     # 使用推理模型
     response = get_llm_by_type(AGENT_LLM_MAP["thinker"]).invoke(messages)
     
     current_step.execution_res = response.content
-    
+    # logger.info(f"Thinker response: {response.content}")
     return Command(
         update={
             "messages": [AIMessage(content=response.content, name="thinker")],
@@ -667,7 +678,10 @@ def reporter_node(state: State, config: RunnableConfig) -> dict:
     configurable = Configuration.from_runnable_config(config)
     
     current_plan = state.get("current_plan")
-    
+    current_step_index = state.get("current_step_index", 0)
+    current_step = current_plan.steps[current_step_index]
+
+    logger.info(f"Reporter node is generating final report. current_step: {current_step}")
     # 构建综合报告输入
     comprehensive_context = f"""
 # Task Overview
@@ -706,5 +720,5 @@ def reporter_node(state: State, config: RunnableConfig) -> dict:
     # 生成最终报告
     response = get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke(invoke_messages)
     logger.info("Final report generated successfully.")
-    print(response.content)
+    # print(response.content)
     return {"final_report": response.content}

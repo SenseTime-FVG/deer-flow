@@ -117,7 +117,7 @@ if __name__ == "__main__":
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Run the Deer")
     parser.add_argument("--query", nargs="*", help="The query to process")
-    parser.add_argument("--file", nargs="*", help="The query to process")
+    parser.add_argument("--file", nargs="*", help="upload files ")
     parser.add_argument(
         "--interactive",
         action="store_true",
@@ -176,3 +176,9 @@ if __name__ == "__main__":
 # main.py --query 分析目前agent的最新研究，给一个详细的报告
 # main.py --query "图中画着什么东西" --file /mnt/afs/yaotiankuo/agents/deer-dev/tests/ts.png
 # main.py --query "看看他是哪个学校毕业的" --file /mnt/afs/yaotiankuo/agents/deer-dev/tests/cv.pdf
+# main.py --query "从图中能获取哪些现象和推论？" --file /mnt/afs/yaotiankuo/agents/deer-dev/tests/report.jpg
+
+# main.py --query "有哪些同学严重偏科, 不使用coder和search，只使用doc_parse" --file /mnt/afs/yaotiankuo/agents/deer-dev/tests/成绩单.xlsx
+# main.py --query " 图中中国玩具的的线上销售渠道有哪些？" --file /mnt/afs/yaotiankuo/agents/deer-dev/tests/sell.jpg
+
+# main.py --query "Q1: 这些材料体现了什么交通事故，责任如何认定？ Q2: 涉及事故的白色小汽车在哪些位置发生明显损坏，如果维修的话需要多少费用？请结合图片和必要的搜索材料回答该问题" --file /mnt/afs/yaotiankuo/agents/deer-dev/tests/multi_images/car1.jpg /mnt/afs/yaotiankuo/agents/deer-dev/tests/multi_images/car2.jpg /mnt/afs/yaotiankuo/agents/deer-dev/tests/multi_images/car3.jpg

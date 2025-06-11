@@ -31,5 +31,4 @@ coverage/
 .vscode/
 sessions/
 
-*.xlsx
-*.pdf
+tests/test_cases/

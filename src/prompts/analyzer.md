@@ -27,6 +27,7 @@ No files available.
 
 # Process
 
+0. **ANALYZE** If the necessary information is already available, only analyze based on the task and the obtained information, without the need to call tools
 1. **Read files** using parse_doc with file uri if needed
 2. **Analyze content** and task requirements, analyze data from file by yourself.
 3. **Delegate** to appropriate agent: 
