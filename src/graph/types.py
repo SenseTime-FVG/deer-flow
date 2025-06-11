@@ -9,7 +9,7 @@ from src.rag import Resource
 
 class State(MessagesState):
     """State for the agent system, extends MessagesState with next field."""
-
+    # 如果不在此定义即使后面有定义也不会更新，不会报错但是不会有新加的变量
     # Runtime Variables
     locale: str = "en-US"
     observations: list[str] = []
@@ -24,3 +24,4 @@ class State(MessagesState):
     session_dir: str = None
 
     current_step_index: int = -1
+    file_info: str

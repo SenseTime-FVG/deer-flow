@@ -1,11 +1,13 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
+import base64
+import io
 import json
 import logging
 import os
 from typing import Annotated, Literal
-
+from PIL import Image
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
@@ -49,29 +51,7 @@ AGENT_LLM_MAP: dict[str, LLMType] = {
 }
 
 
-@tool
-def delegate_to_coder(
-    analysis_request: Annotated[str, "Specific analysis request for the coder"],
-    file_info: Annotated[str, "Information about files to be processed"] = "",
-):
-    """Delegate task to coder agent by inserting a new step."""
-    return f"Will delegate to coder: {analysis_request}"
 
-@tool
-def delegate_to_researcher(
-    research_request: Annotated[str, "Specific research request for the researcher"],
-    search_scope: Annotated[str, "Scope and focus of the research"] = "",
-):
-    """Delegate task to researcher agent by inserting a new step."""
-    return f"Will delegate to researcher: {research_request}"
-
-@tool
-def delegate_to_reader(
-    reader_request: Annotated[str, "Specific request for the reader to process documents/images"],
-    file_info: Annotated[str, "Information about files to be processed"] = "",
-):
-    """Delegate task to reader agent by inserting a new step."""
-    return f"Will delegate to reader: {reader_request}"
 
 @tool
 def handoff_to_planner(
@@ -80,8 +60,49 @@ def handoff_to_planner(
 ):
     """Handoff to planner agent to do plan."""
     return
+@tool
+def call_coder_agent(
+    analysis_request: Annotated[str, "Specific coding request for the coder"]
+):
+    """
+    Delegate task to coder agent For coding tasks. 
+    Parameters:
+        analysis_request: str, Specific code task description, if there are files to be processed, concatenate the file URI at the end of the task description, for example: file_path={URI}
+    Returns:
+        str, The result of code execution after achieving task objectives through code execution
+        """
 
-def _create_delegation_step(target_agent: str, request_content: str, current_step_index: int) -> Step:
+    return f"Will delegate to coder: {analysis_request}"
+
+@tool
+def call_researcher_agent(
+    research_request: Annotated[str, "Specific research request for the researcher"]
+):
+    """
+    Delegate task to researcher agent For research and web searching. 
+    Parameters:
+        research_request: str, Specific research task description, Clearly state the scope of the field you want to research.
+    Returns:
+        str, The result of research
+    """
+
+    return f"Will delegate to researcher: {research_request}"
+@tool
+def call_reader_agent(
+    reader_request: Annotated[str, "Specific image reading process"],
+    file_info: Annotated[str, "Image file path to read"],
+):
+    """
+    Delegate task to reader agent For image understanding and vision question answering. 
+    Parameters:
+        reader_request: str, Specific image readerode task description
+        file_info: Image file path need reading
+    Returns:
+        str, The result of image reading
+        """
+    return f"Will delegate to reader: {reader_request}\nfile_info: {file_info}"
+
+def _create_delegation_step(target_agent: str, request_content: str, current_step_index: int, need_search=False) -> Step:
     """创建委托步骤"""
     step_titles = {
         "coder": "Code Analysis Task",
@@ -90,7 +111,8 @@ def _create_delegation_step(target_agent: str, request_content: str, current_ste
     }
     
     return Step(
-        title=step_titles.get(target_agent, f"{target_agent.title()} Task"),
+        need_search=need_search,
+        title=step_titles.get(target_agent, f"{target_agent} Task"),
         description=request_content,
         step_type=target_agent,
         execution_res=None
@@ -196,7 +218,7 @@ def router_node(
 ) -> Command[Literal["analyzer", "coder", "researcher", "reader", "thinker", "planner", "reporter"]]:
     """路由节点 - 根据planner执行step（按逻辑中转，无LLM）"""
     logger.info("Router node is dispatching tasks.")
-    print(f"router state: {state}")
+    # print(f"router state: {state}")
     current_plan = state.get("current_plan")
     if not current_plan or not current_plan.steps:
         logger.warning("No plan or steps available, routing to planner")
@@ -243,9 +265,38 @@ async def analyzer_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["router"]]:
     """分析器节点 - 可以通过插入step委托其他agent"""
+
+    # def test_direct_tool_call():
+    #     from langchain_core.tools import tool
+    #     print("=== 直接工具调用测试 ===")
+    #     llm = get_llm_by_type(AGENT_LLM_MAP["analyzer"])
+        
+    #     @tool
+    #     def call_reader_agent(reader_request: str):
+    #         """reader_agent"""
+    #         return f"Will delegate to reader: {reader_request}"
+        
+    #     llm_with_tools = llm.bind_tools([call_reader_agent])
+        
+    #     # 测试简单英文prompt
+    #     response = llm_with_tools.invoke([
+    #         HumanMessage(content="Call call_reader_agent with reader_request='analyze image content'")
+    #     ])
+        
+    #     print(f"直接测试结果: {hasattr(response, 'tool_calls') and bool(response.tool_calls)}")
+    #     if hasattr(response, 'tool_calls') and response.tool_calls:
+    #         print(f"Tool calls: {response.tool_calls}")
+    #     else:
+    #         print(f"Response content: {response.content}")
+        
+    #     return response
+
+    # # 运行测试
+    # test_result = test_direct_tool_call()
+
     logger.info("Analyzer node is coordinating task execution.")
     configurable = Configuration.from_runnable_config(config)
-    print(state)
+    # print(state)
     current_plan = state.get("current_plan")
     current_step_index = state.get("current_step_index", 0)
     current_step = current_plan.steps[current_step_index]
@@ -264,8 +315,10 @@ async def analyzer_node(
     messages = apply_prompt_template("analyzer", analyzer_input, configurable)
     print(f"analyzer{current_step_index}: \n{messages[1].content}")
     # 准备委托工具
-    tools = [delegate_to_coder, delegate_to_researcher, delegate_to_reader]
-    
+
+    delegation_tools = [call_coder_agent, call_researcher_agent, call_reader_agent]
+    delegation_tool_names = {tool.name for tool in delegation_tools}
+
     # 处理MCP服务器配置
     mcp_servers = {}
     if configurable.mcp_settings:
@@ -278,77 +331,106 @@ async def analyzer_node(
                     k: v for k, v in server_config.items()
                     if k in ("transport", "command", "args", "url", "env")
                 }
+
+    mcp_tools = []
+    # 创建mcp agent
+    assert mcp_servers
     
-    # 创建agent并执行
-    if mcp_servers:
-        async with MultiServerMCPClient_wFileUpload(mcp_servers, state=state) as client:
-            loaded_tools = tools[:]
-            for tool in client.get_tools():
-                loaded_tools.append(tool)
-            agent = create_agent("analyzer", "analyzer", loaded_tools, "analyzer")
+    async with MultiServerMCPClient_wFileUpload(mcp_servers, state=state) as client:
+        for tool in client.get_tools():
+            mcp_tools.append(tool)
+        print(f"mcp_tools: {mcp_tools}")
             
-            recursion_limit = int(os.getenv("AGENT_RECURSION_LIMIT", "10"))
-            result = await agent.ainvoke(
-                input={"messages": messages},
-                config={"recursion_limit": recursion_limit}
-            )
-        
-        response = result["messages"][-1]
-    else:
-        # 只使用基础工具
-        llm = get_llm_by_type(AGENT_LLM_MAP["analyzer"]).bind_tools(tools)
+        all_tools = delegation_tools + mcp_tools
+        llm = get_llm_by_type(AGENT_LLM_MAP["analyzer"]).bind_tools(all_tools)
         response = llm.invoke(messages)
+        print(response)
+        # 检查tool call
+        if hasattr(response, 'tool_calls') and response.tool_calls:
+            delegation_calls = []
+            mcp_calls = []
+
+            # 判断是mcp还是agent， 如果是mcp需要再将结果返回再跑一遍
+            for tool_call in response.tool_calls:
+                if tool_call["name"] in delegation_tool_names:
+                    delegation_calls.append(tool_call)
+                else:
+                    mcp_calls.append(tool_call)
+            
+            # 执行MCP，获取结果, 目前只执行一次mcp
+            if mcp_calls:
+                mcp_results = []
+                for tool_call in mcp_calls:
+                    # 找到并执行MCP工具
+                    for tool in mcp_tools:
+                        if tool.name == tool_call["name"]:
+                            result = await tool.coroutine(**tool_call["args"])
+                            mcp_results.append(f"{tool_call['name']}: {result}")
+                            break
+                
+                # 将MCP结果返回给analyzer
+                mcp_summary = "MCP Tools Results:\n" + "\n".join(mcp_results)
+                
+                # 第二次LLM调用：基于MCP结果分析
+                analysis_messages = messages + [
+                    AIMessage(content=response.content, tool_calls=response.tool_calls),
+                    HumanMessage(content=f"{mcp_summary}\n\nBased on the MCP results, provide your analysis or delegate to appropriate agents.")
+                ]
+                response = llm.invoke(analysis_messages)
+
+            if delegation_calls:
+                
+                if tool_call["name"] == "call_coder_agent":
+                    # 插入coder步骤
+                    coder_step = _create_delegation_step("coder", tool_call["args"]["analysis_request"], current_step_index)
+                    current_plan.steps.insert(current_step_index + 1, coder_step)
+                    
+                    # 完成当前步骤
+                    current_step.execution_res = f"Delegated to coder: {tool_call['args']['analysis_request']}"
+                    # Task delegated to coder
+                    return Command(
+                        update={
+                            "messages": [AIMessage(content=f"{tool_call['args']['analysis_request']}", name="analyzer")],
+                            "current_plan": current_plan
+                        },
+                        goto="router"
+                    )
+                elif tool_call["name"] == "call_researcher_agent":
+                    # 插入researcher步骤
+                    researcher_step = _create_delegation_step("researcher", tool_call["args"]["research_request"], current_step_index, need_search=True)
+                    current_plan.steps.insert(current_step_index + 1, researcher_step)
+                    
+                    # 完成当前步骤
+                    current_step.execution_res = f"Delegated to researcher: {tool_call['args']['research_request']}"
+                    # Task delegated to researcher
+                    return Command(
+                        update={
+                            "messages": [AIMessage(content=f"{tool_call['args']['research_request']}", name="analyzer")],
+                            "current_plan": current_plan
+                        },
+                        goto="router"
+                    )
+                elif tool_call["name"] == "call_reader_agent":
+                    print(tool_call)
+                    # 插入reader步骤
+                    reader_request = tool_call['args']['reader_request']
+                    file_info = tool_call['args']['file_info']
+
+                    reader_step = _create_delegation_step("reader", reader_request, current_step_index)
+                    current_plan.steps.insert(current_step_index + 1, reader_step)
+                    
+                    # 完成当前步骤
+                    current_step.execution_res = f"Delegated to reader: {reader_request}"
+                    # Task delegated to reader
+                    return Command(
+                        update={
+                            "messages": [AIMessage(content=f"{reader_request}", name="analyzer")],
+                            "current_plan": current_plan,
+                            "file_info": file_info
+                        },
+                        goto="router"
+                    )
     
-    # 处理委托请求
-    if hasattr(response, 'tool_calls') and response.tool_calls:
-        for tool_call in response.tool_calls:
-            if tool_call["name"] == "delegate_to_coder":
-                # 插入coder步骤
-                coder_step = _create_delegation_step("coder", tool_call["args"]["analysis_request"], current_step_index)
-                current_plan.steps.insert(current_step_index + 1, coder_step)
-                
-                # 完成当前步骤
-                current_step.execution_res = f"Delegated to coder: {tool_call['args']['analysis_request']}"
-                # Task delegated to coder
-                return Command(
-                    update={
-                        "messages": [AIMessage(content=f"{tool_call['args']['analysis_request']}", name="analyzer")],
-                        "current_plan": current_plan
-                    },
-                    goto="router"
-                )
-            elif tool_call["name"] == "delegate_to_researcher":
-                # 插入researcher步骤
-                researcher_step = _create_delegation_step("researcher", tool_call["args"]["research_request"], current_step_index)
-                current_plan.steps.insert(current_step_index + 1, researcher_step)
-                
-                # 完成当前步骤
-                current_step.execution_res = f"Delegated to researcher: {tool_call['args']['research_request']}"
-                # Task delegated to researcher
-                return Command(
-                    update={
-                        "messages": [AIMessage(content=f"{tool_call['args']['research_request']}", name="analyzer")],
-                        "current_plan": current_plan
-                    },
-                    goto="router"
-                )
-            elif tool_call["name"] == "delegate_to_reader":
-                # 插入reader步骤
-                reader_step = _create_delegation_step("reader", tool_call["args"]["reader_request"], current_step_index)
-                current_plan.steps.insert(current_step_index + 1, reader_step)
-                
-                # 完成当前步骤
-                current_step.execution_res = f"Delegated to reader: {tool_call['args']['reader_request']}"
-                # Task delegated to reader
-                return Command(
-                    update={
-                        "messages": [AIMessage(content=f"{tool_call['args']['reader_request']}", name="analyzer")],
-                        "current_plan": current_plan
-                    },
-                    goto="router"
-                )
-    
-    # 没有委托，直接完成步骤
     current_step.execution_res = response.content
     
     return Command(
@@ -474,6 +556,37 @@ async def researcher_node(
         goto="router"
     )
 
+def create_message_with_base64_image(text: str, image_path: str) -> HumanMessage:
+    """使用base64编码传递图像, 都转为jpg再转为base64传输"""
+    
+    with Image.open(image_path) as img:
+        # 转换为RGB模式（去除透明通道）
+        if img.mode in ('RGBA', 'LA', 'P'):
+            img = img.convert('RGB')
+        
+        # 保存为JPEG格式到内存
+        buffer = io.BytesIO()
+        img.save(buffer, format='JPEG', quality=85)
+        buffer.seek(0)
+        # 编码为base64
+        base64_image = base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+    # 创建多模态content
+    content = [
+        {
+            "type": "text",
+            "text": text
+        },
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/jpeg;base64,{base64_image}"
+            }
+        }
+    ]
+    
+    return HumanMessage(content=content)
+
 async def reader_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["router"]]:
@@ -487,11 +600,10 @@ async def reader_node(
     
     # 构建reader输入（只使用前一个agent传递的message）
     reader_input = {
-        "messages": [
-            HumanMessage(
-                content=f"# Current Task\n\n## Title\n{current_step.title}\n\n## Description\n{current_step.description}\n\n## Previous Message\n{state.get('messages', [])[-1].content if state.get('messages') else 'No previous message'}\n\n## Locale\n{state.get('locale', 'en-US')}"
-            )
-        ],
+        "messages": [create_message_with_base64_image(
+                text=f"# Current Task\n\n## Title\n{current_step.title}\n\n## Description\n{current_step.description}\n\n## Previous Message\n{state.get('messages', [])[-1].content if state.get('messages') else 'No previous message'}\n\n## Locale\n{state.get('locale', 'en-US')}", 
+                image_path=state.get("file_info", "")
+            )],
         "locale": state.get("locale", "en-US"),
         "resources": state.get("resources", [])
     }
@@ -590,9 +702,9 @@ def reporter_node(state: State, config: RunnableConfig) -> dict:
     
     # 应用reporter模板
     invoke_messages = apply_prompt_template("reporter", reporter_input, configurable)
-    print(f"reporter: \n{invoke_messages}")
+    # print(f"reporter: \n{invoke_messages}")
     # 生成最终报告
     response = get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke(invoke_messages)
     logger.info("Final report generated successfully.")
-    
+    print(response.content)
     return {"final_report": response.content}

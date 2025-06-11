@@ -12,6 +12,8 @@ class StepType(str, Enum):
     CODER = "coder"
     RESEARCHER = "researcher"
     THINKER = "thinker"
+    READER = "reader"
+    
 
 class Step(BaseModel):
     need_search: bool = Field(..., description="Must be explicitly set for each step")

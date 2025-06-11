@@ -171,3 +171,8 @@ if __name__ == "__main__":
         )
 
 # uv run main.py --query "使用analyzer中的docparse工具看文件中张国战的所有加班时长, plan只需要一个step" --file /mnt/afs/yaotiankuo/agents/deer-dev/tests/加班清单.xlsx
+# uv run main.py --query "看文件中张国战的所有加班时长, plan只需要一个step" --file /mnt/afs/yaotiankuo/agents/deer-dev/tests/加班清单.xlsx
+# main.py --query "看文件中张国战的所有加班时长, 使用analyzer调用mcp服务查看,不使用coder" --file /mnt/afs/yaotiankuo/agents/deer-dev/tests/加班清单.xlsx
+# main.py --query 分析目前agent的最新研究，给一个详细的报告
+# main.py --query "图中画着什么东西" --file /mnt/afs/yaotiankuo/agents/deer-dev/tests/ts.png
+# main.py --query "看看他是哪个学校毕业的" --file /mnt/afs/yaotiankuo/agents/deer-dev/tests/cv.pdf
