@@ -30,3 +30,4 @@ coverage/
 # luojiapeng
 .vscode/
 sessions/
+tmp/
