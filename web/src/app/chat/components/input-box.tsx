@@ -3,7 +3,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, X } from "lucide-react";
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { Detective } from "~/components/deer-flow/icons/detective";
 import MessageInput, {
@@ -18,6 +18,7 @@ import {
 } from "~/core/store";
 import { cn } from "~/lib/utils";
 import { AddFileButton } from "./add-file-button";
+import { FileContainer } from "./file-container";
 
 export function InputBox({
   className,
@@ -47,6 +48,7 @@ export function InputBox({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<MessageInputRef>(null);
   const feedbackRef = useRef<HTMLDivElement>(null);
+  const [resources, setResources] = useState<Resource[]>([]);
 
   const handleSendMessage = useCallback(
     (message: string, resources: Array<Resource>) => {
@@ -62,6 +64,7 @@ export function InputBox({
             resources,
           });
           onRemoveFeedback?.();
+          setResources([]);
         }
       }
     },
@@ -76,9 +79,7 @@ export function InputBox({
       )}
       ref={containerRef}
     >
-      {/* <div>
-                <FileContainer></FileContainer>
-        </div> */}
+
       <div className="w-full">
         <AnimatePresence>
           {feedback && (
@@ -104,12 +105,14 @@ export function InputBox({
         <MessageInput
           className={cn("h-24 px-4 pt-5", feedback && "pt-9")}
           ref={inputRef}
-          onEnter={handleSendMessage}
+          onEnter={(message) => handleSendMessage(message, resources)}
         />
       </div>
       <div className="flex items-center px-4 py-2">
         <div className="flex grow gap-2 items-center">
-          <AddFileButton />
+          <AddFileButton onUpload={(resource) => {
+            setResources((prev) => [...prev, resource]);
+          }} />
           <Tooltip
             className="max-w-60"
             title={
@@ -138,6 +141,9 @@ export function InputBox({
               <Detective /> Investigation
             </Button>
           </Tooltip>
+          <div>
+            <FileContainer resources={resources}></FileContainer>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Tooltip title={responding ? "Stop" : "Send"}>

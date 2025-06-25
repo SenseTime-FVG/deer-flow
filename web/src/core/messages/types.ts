@@ -40,4 +40,5 @@ export interface ToolCallRuntime {
 export interface Resource {
   uri: string;
   title: string;
+  description?: string;
 }

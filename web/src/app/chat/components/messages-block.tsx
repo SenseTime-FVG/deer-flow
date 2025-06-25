@@ -91,6 +91,7 @@ export function MessagesBlock({ className }: { className?: string }) {
         onSendMessage={handleSend}
       />
       {!isReplay ? (
+        // Todo: When a image is being uploaded, the input box should be appended: h-42 -> h-50
         <div className="relative flex h-42 shrink-0 pb-4">
           {!responding && messageCount === 0 && (
             <ConversationStarter
@@ -99,7 +100,7 @@ export function MessagesBlock({ className }: { className?: string }) {
             />
           )}
           <InputBox
-            className="h-full w-full"
+            className="h-full w-full flex-grow"
             responding={responding}
             feedback={feedback}
             onSend={handleSend}

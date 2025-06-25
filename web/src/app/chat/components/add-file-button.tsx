@@ -16,15 +16,47 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import type { Resource } from "~/core/messages";
 
-export function AddFileButton() {
+export function AddFileButton({ onUpload }: { onUpload?: (resource: Resource) => void }) {
     const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files ? event.target.files[0] : null;
         if (file) {
-            // ToDo: Implement file upload logic
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                const base64 = reader.result as string;
+                const resource: Resource = {
+                    title: file.type,
+                    uri: base64,
+                    description: file.name,
+                }
+                onUpload?.(resource);
+            };
         }
     }
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        // Handle file upload
+        // The file would be transformed to base64 and passed to the onUpload callback
+        const file = event.target.files ? event.target.files[0] : null;
+        if (file) {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                const base64 = reader.result as string;
+                const resource: Resource = {
+                    title: file.type,
+                    uri: base64,
+                    description: file.name,
+                }
+                onUpload?.(resource);
+            };
+        }
+    }
+
+    const FileInputRef = useRef<HTMLInputElement | null>(null);
     const ImageInputRef = useRef<HTMLInputElement | null>(null);
+
     return (
         <>
             <DropdownMenu>
@@ -51,16 +83,18 @@ export function AddFileButton() {
                         <ImageUp className="text-current" />
                         <span>Upload Image</span>
                     </DropdownMenuItem>
-                    <Tooltip className="max-w-40" title="Not Available Yet" side="bottom">
-                        <DropdownMenuItem>
-                            <FileUp className="text-current" />
-                            <span>Upload File</span>
-                        </DropdownMenuItem>
-                    </Tooltip>
+                    <DropdownMenuItem onClick={() => {
+                        FileInputRef.current?.click();
+                    }}>
+                        <FileUp className="text-current" />
+                        <span>Upload File</span>
+                    </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu >
             <input type="file" ref={ImageInputRef} accept="image/*"
                 onChange={handleImageChange} className="hidden" ></input>
+            <input type="file" ref={FileInputRef} accept="*/*"
+                onChange={handleFileChange} className="hidden" ></input>
         </>
     )
 }
