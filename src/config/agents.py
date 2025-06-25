@@ -16,7 +16,8 @@ NodeType = Literal["coordinator",
                    "reader", 
                    "thinker", 
                    "reporter", 
-                   "supervisor"]
+                   "supervisor",
+                   "receiver"]
 
 @dataclass
 class ToolConfig:
@@ -51,6 +52,7 @@ class AgentConfiguration:
         "thinker": "reasoning",
         "reporter": "basic",
         "supervisor": "basic",
+        "receiver": "basic"
     }
     
     # 节点配置 - 用户可自定义连接关系
@@ -74,13 +76,13 @@ class AgentConfiguration:
             name="planner",
             llm_type="basic",
             enabled_tools=["background_research"],
-            next_nodes=["writer", "coder", "researcher", "reader", "thinker", "reporter"]
+            next_nodes=["writer", "coder", "researcher", "reader", "thinker", "reporter", "receiver"]
         ),
         "supervisor": NodeConfig(
             name="supervisor",
             llm_type="basic",
             enabled_tools=["approve_step", "reject_step", "request_revision"],
-            next_nodes=["writer", "coder", "researcher", "reader", "thinker", "reporter", "__end__"]
+            next_nodes=["writer", "coder", "researcher", "reader", "thinker", "reporter", "__end__", "receiver"]
         ),
         "writer": NodeConfig(
             name="writer",
@@ -110,6 +112,14 @@ class AgentConfiguration:
             next_nodes=["supervisor"],
             requires_approval=True
         ),
+        "receiver": NodeConfig(
+            name="receiver",
+            llm_type="basic",
+            enabled_tools=[], #message_ask_user, display_result
+            next_nodes=["supervisor"],
+            requires_approval=True
+        ),
+
         "reader": NodeConfig(
             name="reader",
             llm_type="vision",
@@ -117,6 +127,7 @@ class AgentConfiguration:
             next_nodes=["supervisor"],
             requires_approval=True
         ),
+
         # "thinker": NodeConfig(
         #     name="thinker",
         #     llm_type="reasoning",
@@ -135,7 +146,6 @@ class AgentConfiguration:
     
     # 工具配置
     TOOL_CONFIGS: Dict[str, ToolConfig] = {
-
         # 初始化本地工具tool
         "python_repl": ToolConfig("python_repl", "interactive"),
         "web_search": ToolConfig("web_search", "interactive"),
@@ -159,5 +169,6 @@ class AgentConfiguration:
         "thinker": "thinker",
         "reporter": "reporter",
         "supervisor": "supervisor",
-        "planner": "planner"
+        "planner": "planner",
+        "receiver": "receiver"
     }

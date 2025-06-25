@@ -8,6 +8,7 @@ from .searcher_node import SearcherNode
 from .thinker_node import ThinkerNode
 from .supervisor_node import SupervisorNode
 from .reporter_node import ReporterNode
+from .receiver_node import ReceiverNode
 
 __all__ = [
     "WriterNode",
@@ -19,5 +20,6 @@ __all__ = [
     "SearcherNode",
     "ThinkerNode",
     "SupervisorNode",
-    "ReporterNode"
+    "ReporterNode",
+    "ReceiverNode"
 ]
