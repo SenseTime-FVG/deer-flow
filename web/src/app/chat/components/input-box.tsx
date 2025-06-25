@@ -17,6 +17,7 @@ import {
   useSettingsStore,
 } from "~/core/store";
 import { cn } from "~/lib/utils";
+import { AddFileButton } from "./add-file-button";
 
 export function InputBox({
   className,
@@ -75,6 +76,9 @@ export function InputBox({
       )}
       ref={containerRef}
     >
+      {/* <div>
+                <FileContainer></FileContainer>
+        </div> */}
       <div className="w-full">
         <AnimatePresence>
           {feedback && (
@@ -104,7 +108,8 @@ export function InputBox({
         />
       </div>
       <div className="flex items-center px-4 py-2">
-        <div className="flex grow">
+        <div className="flex grow gap-2 items-center">
+          <AddFileButton />
           <Tooltip
             className="max-w-60"
             title={
