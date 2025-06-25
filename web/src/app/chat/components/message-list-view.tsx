@@ -177,11 +177,24 @@ function MessageListItem({
                 <Markdown
                   className={cn(
                     message.role === "user" &&
-                      "prose-invert not-dark:text-secondary dark:text-inherit",
+                    "prose-invert not-dark:text-secondary dark:text-inherit",
                   )}
                 >
                   {message?.content}
                 </Markdown>
+                {message.resources && message.resources.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {message.resources.map((resource) => (
+                      <Button
+                        key={resource.uri}
+                        variant="outline"
+                        size="sm"
+                      >
+                        {resource.description || resource.title}
+                      </Button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </MessageBubble>
           </div>
@@ -335,11 +348,10 @@ function PlanCard({
       <CardHeader>
         <CardTitle>
           <Markdown animated>
-            {`### ${
-              plan.title !== undefined && plan.title !== ""
+            {`### ${plan.title !== undefined && plan.title !== ""
                 ? plan.title
                 : "Deep Research"
-            }`}
+              }`}
           </Markdown>
         </CardTitle>
       </CardHeader>

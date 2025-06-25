@@ -110,9 +110,16 @@ export function InputBox({
       </div>
       <div className="flex items-center px-4 py-2">
         <div className="flex grow gap-2 items-center">
-          <AddFileButton onUpload={(resource) => {
-            setResources((prev) => [...prev, resource]);
-          }} />
+          <AddFileButton
+            onUpload={(resource) => {
+              setResources((prev) => {
+                if (prev.some((r) => r.uri === resource.uri)) {
+                  return prev;
+                }
+                return [...prev, resource];
+              });
+            }}
+          />
           <Tooltip
             className="max-w-60"
             title={
