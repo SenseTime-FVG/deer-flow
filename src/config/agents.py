@@ -164,7 +164,7 @@ class AgentConfiguration:
         "writer": "writer",
         "coder": "coder", 
         "interpreter": "interpreter",
-        "researcher": "researcher",
+        "searcher": "searcher",
         "reader": "reader",
         "thinker": "thinker",
         "reporter": "reporter",

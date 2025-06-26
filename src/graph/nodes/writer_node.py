@@ -38,16 +38,9 @@ class WriterNode(BaseNode):
     async def execute(self, state: Dict[str, Any], config: RunnableConfig) -> Command[Literal["supervisor"]]:
         self.log_execution("Starting Coder")
         configurable = Configuration.from_runnable_config(config)
-        input_messages = state.get("messages")
-        supervisor_iterate_time = state["supervisor_iterate_time"]
 
-        # 构建writer输入
-        writer_state = {
-            "messages": input_messages[-supervisor_iterate_time - 1:],
-            "locale": state.get("locale", "en-US"),
-            "resources": state.get("resources", [])
-        }
-        messages = apply_prompt_template("writer", writer_state, configurable)
+        supervisor_iterate_time = state["supervisor_iterate_time"]
+        messages = apply_prompt_template("writer", state, configurable)
         # print(messages)
         # 准备委托工具
         tools = [self.call_supervisor]
@@ -69,6 +62,7 @@ class WriterNode(BaseNode):
             return Command(
                 update={
                     "messages": [HumanMessage(content=node_res_summary, name="writer")],
+                    "supervisor_iterate_time": supervisor_iterate_time + 1
                 },
                 goto="supervisor"
             )

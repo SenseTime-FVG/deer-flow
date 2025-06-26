@@ -84,16 +84,9 @@ class InterpreterNode(BaseNode):
         self.log_execution("Starting interpreter task")
         
         configurable = Configuration.from_runnable_config(config)
-        input_messages = state.get("messages")
         supervisor_iterate_time = state["supervisor_iterate_time"]
 
-        # 构建writer输入
-        writer_state = {
-            "messages": input_messages[-supervisor_iterate_time - 1:],
-            "locale": state.get("locale", "en-US"),
-            "resources": state.get("resources", [])
-        }
-        messages = apply_prompt_template("writer", writer_state, configurable)
+        messages = apply_prompt_template("writer", state, configurable)
         # print(messages)
         # 准备委托工具
         tools = [self.call_supervisor]
@@ -142,7 +135,8 @@ class InterpreterNode(BaseNode):
                     return Command(
                         update={
                             "messages": [HumanMessage(content=node_res_summary, name="writer")],
-                            "tool_call_iterate_time" : 0
+                            "tool_call_iterate_time" : 0,
+                            "supervisor_iterate_time": supervisor_iterate_time + 1
                         },
                         goto="supervisor"
                     )

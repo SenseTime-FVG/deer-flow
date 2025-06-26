@@ -74,17 +74,10 @@ class ReceiverNode(BaseNode):
         """执行接收器逻辑，与用户交互以收集信息，并最终展示"""
 
         configurable = Configuration.from_runnable_config(config)
-        input_messages = state.get("messages", [])
+        supervisor_iterate_time = state["supervisor_iterate_time"]
 
-        # 构建receiver输入
-        receiver_state = {
-            "messages": input_messages,
-            "locale": state.get("locale", "en-US"),
-            "resources": state.get("resources", []),
-        }
-        
         # 应用提示模板
-        messages = apply_prompt_template("receiver", receiver_state, configurable)
+        messages = apply_prompt_template("receiver", state, configurable)
         
         # 准备委托工具
         # Receiver可以调用ask_user_tool和display_result_tool
@@ -118,6 +111,7 @@ class ReceiverNode(BaseNode):
                                 update={
                                     "messages": [HumanMessage(content=result_content, name="receiver")],
                                     "receiver_asked_count": self.asked_count,
+
                                 },
                                 goto="supervisor"
                             )
@@ -148,7 +142,8 @@ class ReceiverNode(BaseNode):
                     node_res_summary += f"\n{final_result_content}"
                     return Command(
                         update={
-                            "messages": [HumanMessage(content=node_res_summary, name="receiver")]
+                            "messages": [HumanMessage(content=node_res_summary, name="receiver")],
+                            "supervisor_iterate_time": supervisor_iterate_time + 1
                         },
                         goto="supervisor"
                     )

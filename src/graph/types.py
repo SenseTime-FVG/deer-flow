@@ -27,6 +27,7 @@ class State(MessagesState):
 
     tool_call_iterate_time: int = 0 # 当前toolcall的迭代次数
     supervisor_iterate_time: int = 0 # supervisor_iterate_time
+    history_clear: bool = False # 是否清空
 
     file_info: str
     need_image: str = "true"

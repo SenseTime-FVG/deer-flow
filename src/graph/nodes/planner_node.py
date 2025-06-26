@@ -107,14 +107,14 @@ class PlannerNode(BaseNode):
 
             """
             summary = f"# 当前任务:\n{first_step.description}\n## details\n {first_step.details}\n"
-            next_node = AgentConfiguration.STEP_TYPE_TO_NODE.get(
-                first_step.type.lower(), "writer"
-            )
+            next_node = AgentConfiguration.STEP_TYPE_TO_NODE[first_step.type.lower()]
+
             return Command(
                 update={
                     "current_plan": new_plan,
                     'current_step_index': "G1-A1",
                     "messages": [HumanMessage(content=summary, name="planner")],
+                    'history_clear': True
                 },
                 goto=next_node
             )

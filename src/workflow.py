@@ -96,7 +96,8 @@ def get_init_state(
         "session_dir": session_dir,
 
         "supervisor_iterate_time":0,
-        "tool_call_iterate_time":0
+        "tool_call_iterate_time":0,
+        "history_clear": False
     }
 
 
@@ -163,28 +164,15 @@ async def run_agent_workflow_async(
         ):
             if "final_report" in s:
                 print(f"Final result:\n{s['final_report']}")
-            # TODO 这里可以加入简单的记忆处理机制，默认是state一直流转全部history 
-            # try:
-            #     if isinstance(s, dict) and "messages" in s:
-            #         if len(s["messages"]) <= last_message_cnt:
-            #             continue
-            #         last_message_cnt = len(s["messages"])
-            #         message = s["messages"][-1]
-                    
-            #         if isinstance(message, tuple):
-            #             print(message)
-            #             pass
-            #         else:
-            #             message.pretty_print()
-            #             pass
-            #     else:
-            #         # For any other output format
-            #         # print(f"Output: {s}")
-            #         pass
-            # except Exception as e:
-            #     logger.error(f"Error processing stream output: {e}")
-            #     print(f"Error processing output: {str(e)}")
-
+            if isinstance(s, dict) and "messages" in s:
+                # 默认会继承全部历史记录，这里如果设置了clear则只保留当前对话
+                if s["history_clear"]:
+                    s["messages"] = [s["messages"][-1]]
+                    s["history_clear"] = False
+                    print("*" * 50)
+                    print(s["messages"])
+                    print("*" * 50)
+                    break
         if isinstance(s, dict) and "__interrupt__" in s:
             # print(f"Interrupt: {s['__interrupt__']}")
             feedback = input(s['__interrupt__'][0].value + ": ")

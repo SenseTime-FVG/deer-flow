@@ -194,14 +194,15 @@ class SupervisorNode(BaseNode):
                         # .get(
                         #     next_action.type.lower(), "reporter"
                         # )
-                        self.log_execution("next_node: " + next_node)
-                        self.log_execution("next_action: " + next_action)
+                        self.log_execution(f"next_node: {next_node}")
+                        self.log_execution(f"next_action: {next_action}")
                         next_step_summary = self.get_next_step(next_action)
                         return Command(
                             update={
                                 "messages": [HumanMessage(content=next_step_summary, name="supervisor")],
                                 "current_step_index": next_action.id,  
-                                "supervisor_iterate_time": 0
+                                "supervisor_iterate_time": 0,
+                                'history_clear': True
                             },
                             goto=next_node
                         )

@@ -74,14 +74,10 @@ class ReporterNode(BaseNode):
 
         """执行报告器逻辑"""
         self.log_execution("Generating final report")
-        
-        reporter_input = {
-            "messages": state["messages"],
-            "locale": state.get("locale", "en-US"),
-        }
-       
+        supervisor_iterate_time = state["supervisor_iterate_time"]
+
         configurable = Configuration.from_runnable_config(config)
-        messages = apply_prompt_template(self.name, reporter_input, configurable)
+        messages = apply_prompt_template(self.name, state, configurable)
         tools = [self.call_supervisor]
         self.log_input_message(messages)
         llm = get_llm_by_type(self.config.llm_type).bind_tools(tools)
@@ -102,6 +98,7 @@ class ReporterNode(BaseNode):
             return Command(
                 update={
                     "messages": [HumanMessage(content=node_res_summary, name="reporter")],
+                    "supervisor_iterate_time": supervisor_iterate_time + 1
                 },
                 goto="supervisor"
             )
