@@ -25,21 +25,16 @@ class PlannerNode(BaseNode):
         
 
     async def execute(self, state: Dict[str, Any], config: RunnableConfig) \
-        -> Command[Literal["writer", "coder", "interpreter", "searcher", "reader", "reporter", "__end__"]]:
+        -> Command[Literal["writer", "coder", "interpreter", "searcher", "reader", "reporter", "receiver", "__end__"]]:
         """执行规划器逻辑"""
         self.log_execution("Generating execution plan")
         
         configurable = Configuration.from_runnable_config(config)
-        messages = apply_prompt_template("planner", state, configurable)
-        
-        # 使用结构化输出生成计划
+        messages = apply_prompt_template(self.name, state, configurable)
+        self.log_input_message(messages)
         llm = get_llm_by_type(self.config.llm_type)
-        #.with_structured_output(
-            # Plan, method="json_mode"
-        # )
         response = llm.invoke(messages)
-  
-        # self.log_execution(response.content)
+
         plan_content = response.content.split("<|plan|>")[1].split("<|end|>")[0]
         # plan_content = response.model_dump_json(indent=4, exclude_none=True)
         """ plan 输出结果示意
@@ -124,7 +119,7 @@ class PlannerNode(BaseNode):
                 goto=next_node
             )
         else:
-            next_node = "reporter"
+            next_node = "supervisor"
         
         return Command(
             update={

@@ -180,7 +180,3 @@ if __name__ == "__main__":
             max_step_num=args.max_step_num,
             enable_background_investigation=args.enable_background_investigation,
         )
-
-
-
-# uv run main.py --query 写个财经小作文,随机按你喜好写别反问我

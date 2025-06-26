@@ -94,8 +94,10 @@ class ReceiverNode(BaseNode):
         response = llm.invoke(messages)
 
         node_res_summary = ""
-
+        iterate_times = state.get("tool_call_iterate_time", 0)
         if hasattr(response, 'tool_calls') and response.tool_calls:
+            iterate_times += 1
+            self.log_tool_call(response, iterate_times)
             for tool_call in response.tool_calls:
                 tool_name = tool_call["name"]
                 tool_args = tool_call["args"]
@@ -155,16 +157,8 @@ class ReceiverNode(BaseNode):
                     self.log_execution(f"ReceiverNode received unexpected tool call: {tool_name}")
                     raise ValueError(f"ReceiverNode received unexpected tool call: {tool_name}")
         else:
-            # LLM没有调用工具
-            self.log_execution("ReceiverNode LLM did not call any tools. This might indicate an issue.")
-            return Command(
-                update={
-                    "messages": [
-                        HumanMessage(content="接收器未能完成任务：未调用任何预期的工具。", name="receiver")
-                    ]
-                },
-                goto="supervisor"
-            )
+            self.log_execution_error("no tool call")
+            raise ValueError
 
 if __name__ == "__main__":
     receiver_try = ReceiverNode()

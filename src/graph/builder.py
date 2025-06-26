@@ -36,7 +36,7 @@ def _build_base_graph():
         "searcher": SearcherNode(tool_manager),
         "reader": ReaderNode(tool_manager),
         # "thinker": ThinkerNode(tool_manager),
-        "recriver": ReceiverNode(tool_manager),
+        "receiver": ReceiverNode(tool_manager),
         "supervisor": SupervisorNode(tool_manager),
         "reporter": ReporterNode(tool_manager),
     }

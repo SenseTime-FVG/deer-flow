@@ -9,12 +9,9 @@ import re
 import json
 import uuid
 import aiohttp
-import logging
 from src.config.configuration import Configuration
 from src.prompts.template import apply_prompt_template
 from src.llms.llm import get_llm_by_type
-
-
 
 class SearcherNode(BaseNode):
     def __init__(self, toolmanager):
@@ -77,7 +74,7 @@ class SearcherNode(BaseNode):
         # print(messages)
         # 准备委托工具
         tools = [self.call_supervisor, self.webSearchTool]
-        
+        self.log_input_message(messages)
         llm = get_llm_by_type( self.config.llm_type).bind_tools(tools)
         response = llm.invoke(messages)
 
@@ -85,13 +82,11 @@ class SearcherNode(BaseNode):
 
         max_toolcall_iterate_times = configurable.max_toolcall_iterate_times
         iterate_times = state.get("tool_call_iterate_time", 0)
-        
         if hasattr(response, 'tool_calls') and response.tool_calls \
             and iterate_times < max_toolcall_iterate_times:
-
-            self.log_execution(f"Search tool call: {response.tool_calls}")
             iterate_times += 1
-            self.log_execution(f"call times: {iterate_times}")
+            self.log_tool_call(response, iterate_times)
+
             for tool_call in response.tool_calls:
                 # 返回给supervisor
                 if tool_call["name"] == "display_result":

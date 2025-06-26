@@ -4,7 +4,8 @@ from langchain_core.messages import AIMessage, ToolMessage, HumanMessage
 
 tool_response = []
 search_engine = get_web_search_tool(5)
-searched_content = search_engine.invoke({'query': '财经小作文'})
+searched_content = search_engine.invoke({'query': '2024年 美股形势'})
+print(searched_content)
 if isinstance(searched_content, list):
     background_results = [
         {"title": elem["title"], "content": elem["content"]}

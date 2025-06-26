@@ -64,7 +64,6 @@ class InterpreterNode(BaseNode):
             }
         }
 
-
         self.python_repl_tool = {
             "name": "python_repl_tool",
             "description": "Use this to execute python code and do data analysis or calculation. If you want to see the output of a value, you should print it out with `print(...)`. This is visible to the user.",
@@ -129,17 +128,21 @@ class InterpreterNode(BaseNode):
             tools.append(self.python_repl_tool)
 
         llm = get_llm_by_type( self.config.llm_type).bind_tools(tools)
+        self.log_input_message(messages)
         response = llm.invoke(messages)
 
         node_res_summary = ""
-
+        iterate_times = state.get("tool_call_iterate_time", 0)
         if hasattr(response, 'tool_calls') and response.tool_calls:
+            iterate_times += 1
+            self.log_tool_call(response, iterate_times)
             for tool_call in response.tool_calls:
                 if tool_call["name"] == "display_result":
                     node_res_summary += f"\n{tool_call['args']['result']}"
                     return Command(
                         update={
                             "messages": [HumanMessage(content=node_res_summary, name="writer")],
+                            "tool_call_iterate_time" : 0
                         },
                         goto="supervisor"
                     )
@@ -163,7 +166,11 @@ class InterpreterNode(BaseNode):
 
                     return Command(
                         update={
-                            "messages": [ToolMessage(content=ci_result, name="interpreter")],
+                            "messages": [ToolMessage(content=ci_result, name="interpreter", tool_call_id=response.tool_call["id"])],
+                            "tool_call_iterate_time" : iterate_times
                         },
                         goto="interpreter"
                     )
+        else:
+            self.log_execution_error("no tool call")
+            raise ValueError

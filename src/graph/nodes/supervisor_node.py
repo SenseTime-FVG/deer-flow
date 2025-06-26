@@ -121,9 +121,9 @@ class SupervisorNode(BaseNode):
         return summary
 
     async def execute(self, state: Dict[str, Any], config: RunnableConfig) \
-        -> Command[Literal["writer", "reporter", "searcher", "coder", "interpreter", "reader", "__end__"]]|Dict[str, Any]:
+        -> Command[Literal["writer", "reporter", "searcher", "coder", "interpreter", "reader", "receiver", "__end__"]]|Dict[str, Any]:
         """执行supervisor逻辑"""
-        self.log_execution("Evaluating step completion")
+        self.log_execution("Supervisor step completion")
         
         # 导入必要的模块
         from src.config.configuration import Configuration
@@ -151,7 +151,7 @@ class SupervisorNode(BaseNode):
         llm = get_llm_by_type(self.config.llm_type).bind_tools(tools)
         
         response = llm.invoke(supervisor_input)
-
+        self.log_execution(response)
         # max_supervisor_iterate_times = configurable.max_supervisor_iterate_times
         # 处理supervisor的决策
         if hasattr(response, 'tool_calls') and response.tool_calls:
@@ -189,13 +189,13 @@ class SupervisorNode(BaseNode):
                         self.log_execution(f"Step {current_step_index} complete")
                         self.plan_update(current_step_index, current_step_res)
                         self.log_execution("supervisor plan update")
-                        self.log_execution(self.current_plan)
+                        # self.log_execution(self.current_plan)
                         next_node = AgentConfiguration.STEP_TYPE_TO_NODE[next_action.type.lower()]
                         # .get(
                         #     next_action.type.lower(), "reporter"
                         # )
-                        self.log_execution(next_node)
-                        self.log_execution(next_action)
+                        self.log_execution("next_node: " + next_node)
+                        self.log_execution("next_action: " + next_action)
                         next_step_summary = self.get_next_step(next_action)
                         return Command(
                             update={

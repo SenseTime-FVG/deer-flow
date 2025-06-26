@@ -8,15 +8,11 @@ from src.llms.llm import get_llm_by_type
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 from typing import Literal, Dict, Any
-import json
-import logging
-
-logger = logging.getLogger(__name__)
 
 class CoderNode(BaseNode):
     
     def __init__(self, toolmanager):
-        super().__init__("writer", AgentConfiguration.NODE_CONFIGS["writer"], toolmanager)
+        super().__init__("coder", AgentConfiguration.NODE_CONFIGS["writer"], toolmanager)
         # 输出给superviser的参数
         self.call_supervisor = {
             "name": "display_result",
@@ -54,7 +50,6 @@ class CoderNode(BaseNode):
         configurable = Configuration.from_runnable_config(config)
         input_messages = state.get("messages")
         supervisor_iterate_time = state["supervisor_iterate_time"]
-
         # 构建writer输入
         writer_state = {
             "messages": input_messages[-supervisor_iterate_time - 1:],
@@ -62,16 +57,17 @@ class CoderNode(BaseNode):
             "resources": state.get("resources", [])
         }
         messages = apply_prompt_template("coder", writer_state, configurable)
-        # print(messages)
-        # 准备委托工具
+
         tools = [self.call_supervisor]
-        
+        self.log_input_message(messages)
         llm = get_llm_by_type( self.config.llm_type).bind_tools(tools)
         response = llm.invoke(messages)
-
+        
         node_res_summary = ""
-
+        iterate_times = state.get("tool_call_iterate_time", 0)
         if hasattr(response, 'tool_calls') and response.tool_calls:
+            iterate_times += 1
+            self.log_tool_call(response, iterate_times)
             for tool_call in response.tool_calls:
                 if tool_call["name"] == "display_result":
                     node_res_summary += f"\n{tool_call['args']['codes']}"
@@ -79,10 +75,14 @@ class CoderNode(BaseNode):
                     node_res_summary += f"\n{tool_call}"
                     # print(node_res_summary)
                     raise ValueError
-        
-        return Command(
-            update={
-                "messages": [HumanMessage(content=node_res_summary, name="coder")],
-            },
-            goto="supervisor"
-        )
+            return Command(
+                update={
+                    "messages": [HumanMessage(content=node_res_summary, name="coder")],
+                    "tool_call_iterate_time" : 0
+                },
+                goto="supervisor"
+            )
+        else:
+            self.log_execution_error("no tool call")
+            raise ValueError
+    

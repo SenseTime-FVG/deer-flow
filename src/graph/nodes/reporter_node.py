@@ -81,18 +81,17 @@ class ReporterNode(BaseNode):
         }
        
         configurable = Configuration.from_runnable_config(config)
-        # 应用reporter模板
-        invoke_messages = apply_prompt_template("reporter", reporter_input, configurable)
-        # print(f"reporter: \n{invoke_messages}")
-        # 生成最终报告
+        messages = apply_prompt_template(self.name, reporter_input, configurable)
         tools = [self.call_supervisor]
-        response = get_llm_by_type(self.config.llm_type).bind_tools(tools).invoke(invoke_messages)
-        self.log_execution("Final report generated successfully.")
-        self.log_execution(f"{response.tool_calls[0]['args']}")
-        
-        node_res_summary = ""
+        self.log_input_message(messages)
+        llm = get_llm_by_type(self.config.llm_type).bind_tools(tools)
+        response = llm.invoke(messages)
 
+        node_res_summary = ""
+        iterate_times = state.get("tool_call_iterate_time", 0)
         if hasattr(response, 'tool_calls') and response.tool_calls:
+            iterate_times += 1
+            self.log_tool_call(response, iterate_times)
             for tool_call in response.tool_calls:
                 if tool_call["name"] == "display_result":
                     node_res_summary += f"\n{tool_call['args']['result']}"
@@ -100,10 +99,12 @@ class ReporterNode(BaseNode):
                     node_res_summary += f"\n{tool_call}"
                     raise ValueError
                 
-        return Command(
-            update={
-                "messages": [HumanMessage(content=node_res_summary, name="reporter")],
-            },
-            goto="supervisor"
-        )
-    
+            return Command(
+                update={
+                    "messages": [HumanMessage(content=node_res_summary, name="reporter")],
+                },
+                goto="supervisor"
+            )
+        else:
+            self.log_execution_error("no tool call")
+            raise ValueError

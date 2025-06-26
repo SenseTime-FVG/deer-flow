@@ -120,29 +120,27 @@ class CoordinatorNode(BaseNode):
             }
         }
 
+        self.tools = [self.webSearchTool, self.askUserTool, self.call_planner]
+
     async def execute(self, state: Dict[str, Any], config: RunnableConfig) -> Command[Literal["planner", "__end__"]]:
         """执行协调器逻辑"""
         self.log_execution("Starting coordination")
     
-        # 初始化 enabled_tools 下一个节点的tool call信息不在此初始化
-        tools = [self.webSearchTool, self.askUserTool, self.call_planner]
-
+        # 执行节点标准流程 
         configurable = Configuration.from_runnable_config(config)
-        messages = apply_prompt_template("coordinator", state, configurable)
-        self.log_execution(messages)
-        llm = get_llm_by_type(self.config.llm_type).bind_tools(tools)
+        messages = apply_prompt_template(self.name, state, configurable)
+        self.log_input_message(messages)
+        llm = get_llm_by_type(self.config.llm_type).bind_tools(self.tools)
         response = llm.invoke(messages)
-
-        self.log_execution(f"Coordinator response: {response.content}")
+        self.log_execution(response)
         
         max_toolcall_iterate_times = configurable.max_toolcall_iterate_times
         iterate_times = state.get("tool_call_iterate_time", 0)
         if hasattr(response, 'tool_calls') and response.tool_calls \
             and iterate_times < max_toolcall_iterate_times:
-
-            self.log_execution(f"Coordinator tool call: {response.tool_calls}")
             iterate_times += 1
-            self.log_execution(f"call times: {iterate_times}")
+            self.log_tool_call(response, iterate_times)
+
             for tool_call in response.tool_calls:
                 if tool_call["name"] == "planner":
                     # 这里直接给planner
@@ -188,8 +186,9 @@ class CoordinatorNode(BaseNode):
                         },
                         goto="coordinator"
                     )
-
-        if iterate_times == 0:
+        else:
+            self.log_execution("NO tool call, complete dialogue directly")
+        
             goto = "__end__"
             return Command(
                 update={

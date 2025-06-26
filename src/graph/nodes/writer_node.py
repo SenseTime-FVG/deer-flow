@@ -36,7 +36,7 @@ class WriterNode(BaseNode):
         }
     
     async def execute(self, state: Dict[str, Any], config: RunnableConfig) -> Command[Literal["supervisor"]]:
-        
+        self.log_execution("Starting Coder")
         configurable = Configuration.from_runnable_config(config)
         input_messages = state.get("messages")
         supervisor_iterate_time = state["supervisor_iterate_time"]
@@ -51,12 +51,12 @@ class WriterNode(BaseNode):
         # print(messages)
         # 准备委托工具
         tools = [self.call_supervisor]
-        
+        self.log_input_message(messages)
         llm = get_llm_by_type( self.config.llm_type).bind_tools(tools)
         response = llm.invoke(messages)
+        self.log_execution(response)
 
         node_res_summary = ""
-
         if hasattr(response, 'tool_calls') and response.tool_calls:
             for tool_call in response.tool_calls:
                 if tool_call["name"] == "display_result":
@@ -66,9 +66,12 @@ class WriterNode(BaseNode):
                     # print(node_res_summary)
                     raise ValueError
         
-        return Command(
-            update={
-                "messages": [HumanMessage(content=node_res_summary, name="writer")],
-            },
-            goto="supervisor"
-        )
+            return Command(
+                update={
+                    "messages": [HumanMessage(content=node_res_summary, name="writer")],
+                },
+                goto="supervisor"
+            )
+        else:
+            self.log_execution_error("no tool call")
+            raise ValueError
