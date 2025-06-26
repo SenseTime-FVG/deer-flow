@@ -44,7 +44,7 @@ class ChatRequest(BaseModel):
         3, description="The maximum number of steps in a plan"
     )
     max_search_results: Optional[int] = Field(
-        3, description="The maximum number of search results"
+        5, description="The maximum number of search results"
     )
     auto_accepted_plan: Optional[bool] = Field(
         False, description="Whether to automatically accept the plan"

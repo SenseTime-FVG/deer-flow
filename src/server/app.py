@@ -2,11 +2,16 @@
 # SPDX-License-Identifier: MIT
 
 import base64
+from datetime import datetime
+import os.path as osp
 import json
 import logging
 import os
+from pathlib import Path
+import tempfile
 from typing import Annotated, List, cast
 from uuid import uuid4
+import uuid
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,6 +42,7 @@ from src.server.rag_request import (
     RAGResourcesResponse,
 )
 from src.tools import VolcengineTTS
+from src.utils.file_descriptors import resources2user_input
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +62,24 @@ app.add_middleware(
 )
 
 graph = build_graph_with_memory()
+
+CACHE_RESOURCES_DIR = Path(tempfile.mkdtemp(prefix="deerflow_cache_"))
+
+
+def cache_resources(
+    resource: Resource,
+    session_id: str,
+    session_dir: Path = CACHE_RESOURCES_DIR,
+):
+    """Cache resources in the graph memory."""
+    binary_data = base64.b64decode(resource.uri.split(",")[-1])
+    resource_path = Path(session_dir) / resource.description
+    resource_path.write_bytes(binary_data)
+    return {
+        "uri": str(resource_path),
+        "title": resource.description.rsplit(".", 1)[0],
+        "description": str(resource_path),
+    }
 
 
 @app.post("/api/chat/stream")
@@ -92,15 +116,45 @@ async def _astream_workflow_generator(
     mcp_settings: dict,
     enable_background_investigation,
 ):
+    session_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + str(uuid.uuid4().hex[:8])
+    session_dir = osp.join(os.environ.get('SESSION_DIR', './sessions'), session_id)
+    if not osp.exists(session_dir):
+        os.makedirs(session_dir)
+    resources = [cache_resources(resource, session_id, session_dir) for resource in resources]
+
+    for res_i, resource in enumerate(resources):
+        resources[res_i]['resource_id'] = res_i
+
+    cur_messages = messages[-1]
+    assert cur_messages["role"] == "user"
+    if isinstance(cur_messages["content"], str):
+        user_input_text = cur_messages["content"]
+    elif isinstance(cur_messages["content"], list):
+        user_input_text = cur_messages["content"][0]["text"]
+
+
+    user_input_text = user_input_text + "\n\n" + resources2user_input(resources)
+    # messages = [{"role": "user", "content": messages[-1].content}]
+    print(f"{user_input_text=}")
     input_ = {
-        "messages": messages,
+        "messages":  [{"role": "user", "content": user_input_text}],
         "plan_iterations": 0,
         "final_report": "",
         "current_plan": None,
         "observations": [],
         "auto_accepted_plan": auto_accepted_plan,
         "enable_background_investigation": enable_background_investigation,
+        "messages": [{"role": "user", "content": user_input_text}],
+        "resources": resources,
+        "locale": "zh-CN",
+        "auto_accepted_plan": True,
+        "enable_background_investigation": enable_background_investigation,
+        "session_id": session_id,
+        "session_dir": session_dir,
     }
+
+
+
     if not auto_accepted_plan and interrupt_feedback:
         resume_msg = f"[{interrupt_feedback}]"
         # add the last message to the resume message
@@ -115,7 +169,25 @@ async def _astream_workflow_generator(
             "max_plan_iterations": max_plan_iterations,
             "max_step_num": max_step_num,
             "max_search_results": max_search_results,
-            "mcp_settings": mcp_settings,
+            "max_toolcall_iterater_times": 5,
+            # "mcp_settings": mcp_settings,
+            "mcp_settings": {
+                "servers": {
+                    "doc_parser": {
+                        "transport": "sse",
+                        "url": "http://127.0.0.1:8010/sse",
+                        "enabled_tools": ["parse_doc"],
+                        "add_to_agents": ["analyzer"],
+                    },
+                    "Sandbox": {
+                        "transport": "sse",
+                        "url": "http://0.0.0.0:8015/sse",
+                        "enabled_tools": ["run_code_sandbox_fusion"],
+                        "add_to_agents": ["coder"],
+                    },
+                }
+            },
+            "recursion_limit": 25, #为整个的调度次数
         },
         stream_mode=["messages", "updates"],
         subgraphs=True,
