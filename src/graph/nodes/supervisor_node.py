@@ -1,6 +1,6 @@
 from .base_node import BaseNode
 from src.config.agents import AgentConfiguration
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 from typing import Literal, Dict, Any
@@ -199,10 +199,10 @@ class SupervisorNode(BaseNode):
                         next_step_summary = self.get_next_step(next_action)
                         return Command(
                             update={
-                                "messages": [HumanMessage(content=next_step_summary, name="supervisor")],
+                                "messages": [RemoveMessage(id="__remove_all__"), 
+                                             HumanMessage(content=next_step_summary, name="supervisor")],
                                 "current_step_index": next_action.id,  
                                 "supervisor_iterate_time": 0,
-                                'history_clear': True
                             },
                             goto=next_node
                         )

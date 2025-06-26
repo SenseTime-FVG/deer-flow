@@ -119,7 +119,6 @@ class AgentConfiguration:
             next_nodes=["supervisor"],
             requires_approval=True
         ),
-
         "reader": NodeConfig(
             name="reader",
             llm_type="vision",
@@ -127,7 +126,6 @@ class AgentConfiguration:
             next_nodes=["supervisor"],
             requires_approval=True
         ),
-
         # "thinker": NodeConfig(
         #     name="thinker",
         #     llm_type="reasoning",

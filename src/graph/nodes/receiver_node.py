@@ -85,12 +85,8 @@ class ReceiverNode(BaseNode):
 
         llm = get_llm_by_type(self.config.llm_type).bind_tools(tools)
         response = llm.invoke(messages)
-
         node_res_summary = ""
-        iterate_times = state.get("tool_call_iterate_time", 0)
         if hasattr(response, 'tool_calls') and response.tool_calls:
-            iterate_times += 1
-            self.log_tool_call(response, iterate_times)
             for tool_call in response.tool_calls:
                 tool_name = tool_call["name"]
                 tool_args = tool_call["args"]
@@ -98,20 +94,19 @@ class ReceiverNode(BaseNode):
                 if tool_name == "message_ask_user":
                     question = tool_args.get("text")
                     if question:
-                        self.asked_count += 1
-                        self.log_execution(f"ReceiverNode asking user: {question} (Asked count: {self.asked_count})")
+                        iterate_times += 1
+                        self.log_execution(f"ReceiverNode asking user: {question} (Asked count: {iterate_times})")
                         
                         # 如果达到或超过最大询问次数，强制display_result
-                        if self.asked_count > self.max_ask_limit:
+                        if iterate_times > self.max_ask_limit:   
                             self.log_execution(f"ReceiverNode reached max ask limit ({self.max_ask_limit}). Forcing display_result.")
                             # 模拟display_result调用，提示用户未提供有效信息
-                            result_content = "用户未提供有效信息，已达到最大询问次数限制。"
+                            result_content = "用户未提供有效信息，已达到最大询问次数限制。"   #  是这个吗
                             # 更新状态并直接goto supervisor
                             return Command(
                                 update={
-                                    "messages": [HumanMessage(content=result_content, name="receiver")],
-                                    "receiver_asked_count": self.asked_count,
-
+                                    "messages": [HumanMessage(content=result_content, name="receiver")],   #这边是AImessage还是Human
+                                    "tool_call_iterate_time": 0,
                                 },
                                 goto="supervisor"
                             )
@@ -123,7 +118,8 @@ class ReceiverNode(BaseNode):
                             return Command(
                                 update={
                                     "messages": [response,
-                                        ToolMessage(content=feedback_query, tool_call_id=tool_call["id"])]
+                                        ToolMessage(content=feedback_query, tool_call_id=tool_call["id"])],
+                                    "tool_call_iterate_time": iterate_times
                                 },
                                 goto="receiver"
                             )
@@ -143,7 +139,7 @@ class ReceiverNode(BaseNode):
                     return Command(
                         update={
                             "messages": [HumanMessage(content=node_res_summary, name="receiver")],
-                            "supervisor_iterate_time": supervisor_iterate_time + 1
+                            "tool_call_iterate_time": 0,
                         },
                         goto="supervisor"
                     )
@@ -152,8 +148,17 @@ class ReceiverNode(BaseNode):
                     self.log_execution(f"ReceiverNode received unexpected tool call: {tool_name}")
                     raise ValueError(f"ReceiverNode received unexpected tool call: {tool_name}")
         else:
-            self.log_execution_error("no tool call")
-            raise ValueError
+            # LLM没有调用工具  是直接raise ValueError还是传递给supervisor
+            self.log_execution("ReceiverNode LLM did not call any tools. This might indicate an issue.")
+            return Command(
+                update={
+                    "messages": [
+                        HumanMessage(content="Receiver 未能完成任务：未调用任何预期的工具。", name="receiver"),
+                    ],
+                    "tool_call_iterate_time": 0,
+                },
+                goto="supervisor"
+            )
 
 if __name__ == "__main__":
     receiver_try = ReceiverNode()

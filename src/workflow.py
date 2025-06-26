@@ -155,33 +155,32 @@ async def run_agent_workflow_async(
                 }
             },
         },
-        "recursion_limit": 25, #为整个的调度次数
+        "recursion_limit": 50, #为整个的调度次数
     }
     last_message_cnt = 0
     while True:
         async for s in graph.astream(
             input=initial_state, config=config, stream_mode="values"
         ):
+
             if "final_report" in s:
                 print(f"Final result:\n{s['final_report']}")
-            if isinstance(s, dict) and "messages" in s:
-                # 默认会继承全部历史记录，这里如果设置了clear则只保留当前对话
-                if s["history_clear"]:
-                    s["messages"] = [s["messages"][-1]]
-                    s["history_clear"] = False
-                    print("*" * 50)
-                    print(s["messages"])
-                    print("*" * 50)
-                    break
+                break
+            # if isinstance(s, dict) and "messages" in s:
+            #     # 默认会继承全部历史记录，这里如果设置了clear则只保留当前对话
+            #     if s["history_clear"]:
+            #         s["messages"] = s["messages"][-1]
+            #         s["history_clear"] = False
+            #         print("*" * 50)
+            #         print(s["messages"])
+            #         print("*" * 50)
+                    
         if isinstance(s, dict) and "__interrupt__" in s:
             # print(f"Interrupt: {s['__interrupt__']}")
             feedback = input(s['__interrupt__'][0].value + ": ")
             initial_state = Command(resume=feedback)
-        else:
-            logger.info("Async workflow completed successfully")
-            break
-
-
-
+ 
+        logger.info("Async workflow completed successfully")
+        
 if __name__ == "__main__":
     print(graph.get_graph(xray=True).draw_mermaid())

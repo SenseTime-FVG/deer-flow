@@ -86,7 +86,8 @@ class SearcherNode(BaseNode):
                     return Command(
                         update={
                             "messages": [HumanMessage(content=node_res_summary, name="writer")],
-                            "supervisor_iterate_time": supervisor_iterate_time + 1
+                            "supervisor_iterate_time": supervisor_iterate_time + 1,
+                            "tool_call_iterate_time" : 0
                         },
                         goto="supervisor"
                     )

@@ -3,7 +3,7 @@
 
 from .base_node import BaseNode
 from src.config.agents import AgentConfiguration
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 from typing import Literal, Dict, Any
@@ -113,8 +113,8 @@ class PlannerNode(BaseNode):
                 update={
                     "current_plan": new_plan,
                     'current_step_index': "G1-A1",
-                    "messages": [HumanMessage(content=summary, name="planner")],
-                    'history_clear': True
+                    "messages": [RemoveMessage(id="__remove_all__"), 
+                                 HumanMessage(content=summary, name="planner")],
                 },
                 goto=next_node
             )
