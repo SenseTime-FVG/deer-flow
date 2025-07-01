@@ -11,7 +11,8 @@ from src.utils.file_descriptors import file2resource, resources2user_input
 import uuid
 import shutil
 from langgraph.types import Command
-
+import json
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 
 # Configure logging
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 # Create the graph
 # graph = build_graph()
-graph = build_graph_with_memory() # ask user need memory
+
 
 def get_init_state(
         user_input: str | list[dict], 
@@ -97,7 +98,14 @@ def get_init_state(
 
         "supervisor_iterate_time":0,
         "tool_call_iterate_time":0,
-        "history_clear": False
+        "history_clear": False,
+        
+        # 是否需要中断进行数据收集
+        "is_break": True,
+        "planner_node_capture": False,
+        
+        # 是否使用llm模拟用户回答
+        "use_llm_simulate_user": True
     }
 
 
@@ -107,6 +115,7 @@ async def run_agent_workflow_async(
     max_plan_iterations: int = 1,
     max_step_num: int = 3,
     enable_background_investigation: bool = True,
+    output_path: str = None
 ):
     """Run the agent workflow asynchronously with the given user input.
 
@@ -127,7 +136,9 @@ async def run_agent_workflow_async(
         enable_debug_logging()
 
     logger.info(f"Starting async workflow with user input: {user_input}")
-
+    
+    graph = build_graph_with_memory() # ask user need memory
+    
     initial_state = get_init_state(user_input, enable_background_investigation)
 
     config = {
@@ -158,14 +169,69 @@ async def run_agent_workflow_async(
         "recursion_limit": 50, #为整个的调度次数
     }
     last_message_cnt = 0
+    
+    should_stop_workflow = False
+    
     while True:
         async for s in graph.astream(
             input=initial_state, config=config, stream_mode="values"
         ):
+            if isinstance(s, dict) and s.get("planner_node_capture"):
+                # 遍历 messages 列表，将每个 HumanMessage 转换为字典
+                serializable_messages = []
+                for msg in s.get('messages'):
+                    if isinstance(msg, HumanMessage):
+                        serializable_messages.append({
+                            "type": "human", # 明确消息类型
+                            "content": msg.content,
+                            "additional_kwargs": msg.additional_kwargs,
+                            "response_metadata": msg.response_metadata,
+                            "id": msg.id,
+                            "name":msg.name
+                            # 根据需要添加其他属性
+                        })
+                    # 如果还有其他类型的消息（如 AIMessage），也需要进行相应的处理
+                    elif isinstance(msg, AIMessage):
+                        serializable_messages.append({
+                            "type": "assistant",
+                            "content": msg.content,
+                            "additional_kwargs": msg.additional_kwargs,
+                            "response_metadata": msg.response_metadata,
+                            "id": msg.id,
+                            "name":msg.name
+                        })
+                    elif isinstance(msg, ToolMessage):
+                        serializable_messages.append({
+                            "type": "tool",
+                            "content": msg.content,
+                            "additional_kwargs": msg.additional_kwargs,
+                            "response_metadata": msg.response_metadata,
+                            "id": msg.id,
+                            "name":msg.name
+                        })
+                    else:
+                        # 如果有其他非 HumanMessage 且非 AIMessage 的消息类型，直接保留或报错
+                        serializable_messages.append(msg) # 或者选择跳过，或者报错
 
+                # 创建一个可序列化版本的 state
+                serializable_state = s.copy()
+                serializable_state['messages'] = serializable_messages
+                    # print(s_as_dict.type)
+                print(f"plan返回：{s['messages']}")
+                print(f"完整的state{serializable_state}")
+                should_stop_workflow = True
+                if output_path:
+                    with open(output_path, 'a', encoding='utf-8') as f:
+                        f.write(json.dumps(serializable_state, ensure_ascii=False)+"\n")
+                    logger.info(f"Workflow state saved to {output_path}")
+                break
+                
             if "final_report" in s:
                 print(f"Final result:\n{s['final_report']}")
+                should_stop_workflow = True
                 break
+            
+        
             # if isinstance(s, dict) and "messages" in s:
             #     # 默认会继承全部历史记录，这里如果设置了clear则只保留当前对话
             #     if s["history_clear"]:
@@ -179,8 +245,16 @@ async def run_agent_workflow_async(
             # print(f"Interrupt: {s['__interrupt__']}")
             feedback = input(s['__interrupt__'][0].value + ": ")
             initial_state = Command(resume=feedback)
- 
+
+        if should_stop_workflow:
+            logger.info("Workflow stopped as requested after plan generation or return final.")
+            return 
+        
         logger.info("Async workflow completed successfully")
+            
+
+    
+    
         
 if __name__ == "__main__":
     print(graph.get_graph(xray=True).draw_mermaid())

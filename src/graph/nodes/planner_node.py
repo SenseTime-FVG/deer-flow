@@ -34,11 +34,10 @@ class PlannerNode(BaseNode):
         self.log_input_message(messages)
         llm = get_llm_by_type(self.config.llm_type)
         response = llm.invoke(messages)
-
+        
         plan_content = response.content.split("<|plan|>")[1].split("<|end|>")[0]
         # plan_content = response.model_dump_json(indent=4, exclude_none=True)
         """ plan 输出结果示意
-        [
         {
             "title": "AI Market Research Project",
             "description": "Comprehensive analysis of current AI market trends and opportunities",
@@ -84,49 +83,81 @@ class PlannerNode(BaseNode):
                 }
             ]
         }
-    ]
         """
         self.log_execution(f"Generated plan: {plan_content}")
         
-        plan_dict = json.loads(plan_content)
-        new_plan = Plan.model_validate(plan_dict)
+        # try:
+        #     plan_dict = json.loads(plan_content.strip())
+            
+        # except Exception as e:
+        #     self.log_execution_error(e)
+        #     return {"final_report": response.content}
+        
+        if state.get("is_break", False):
+            return Command(
+                update={
+                    "messages": [response],
+                    "planner_node_capture": True
+                },
+                goto="__end__" # 直接结束流程
+            )
+        else:
 
-        # 确定第一个要执行的节点
-        if len(new_plan.goals) > 0:
-            first_step = new_plan.goals[0].actions[0]
-            """
-            {
-                "id": "G1-A1",
-                "description": "action1的详细描述",
-                "type": "员工类型", "searcher" "receiver" "coder" "interpreter" "anaylzer" "reporter" 
-                "dependencies": []  // 依赖的action id,
-                "details": "需要补充的相关细节信息，但是不要限定子模型具体使用的工具"
-                "references":[], //reference ids
-                "status": "pending|waiting|processing|completed"
-            }
+            # new_plan = Plan.model_validate(plan_dict)
+            plan_dict = json.loads(plan_content.strip())
+            # 确定第一个要执行的节点
+            if len(plan_dict['goals']) > 0:
+                total_title = plan_dict['title']
+                total_description = plan_dict['description']
+                first_step = plan_dict['goals'][0]
+                first_step['actions'] = [plan_dict['goals'][0]['actions'][0]]
+                """
+                {
+                    "title" : "分析IF椰子水的股票投资价值",
+                    "description" : "从业务构成、市场空间、基石投资者及承销商表现等维度评估IFBH港股投资价值",
+                    "goals" : [
+                        {
+                            "id":"G1",
+                            "description":,
+                            "actions":[
+                                {
+                                    "id": "G1-A1",
+                                    "description": "action1的详细描述",
+                                    "type": "员工类型", "searcher" "receiver" "coder" "interpreter" "anaylzer" "reporter" 
+                                    "dependencies": []  // 依赖的action id,
+                                    "details": "需要补充的相关细节信息，但是不要限定子模型具体使用的工具"
+                                    "references":[], //reference ids
+                                    "status": "pending|waiting|processing|completed"
+                                }
+                            ]
+                        },
+                    ]
+                }
 
-            """
-            summary = f"# 当前任务:\n{first_step.description}\n## details\n {first_step.details}\n"
-            next_node = AgentConfiguration.STEP_TYPE_TO_NODE[first_step.type.lower()]
+                """
+                first_step_dict = {"title" :total_title, "description": total_description, "goals": [first_step]}
+                print(first_step_dict)
+                new_plan = Plan.model_validate(first_step_dict)
+                next_node = AgentConfiguration.STEP_TYPE_TO_NODE[new_plan.goals[0].actions[0].type.lower()]
 
+                return Command(
+                    update={
+                        "current_plan": new_plan,
+                        'current_step_index': "G1-A1",
+                        "messages": [RemoveMessage(id="__remove_all__"), 
+                                    HumanMessage(content=first_step_dict, name="planner")],
+                    },
+                    goto=next_node
+                )
+            else:
+                next_node = "supervisor"
+            
             return Command(
                 update={
                     "current_plan": new_plan,
                     'current_step_index': "G1-A1",
-                    "messages": [RemoveMessage(id="__remove_all__"), 
-                                 HumanMessage(content=summary, name="planner")],
+                    "messages": [HumanMessage(content=json.dumps(plan_content, ensure_ascii=False, indent=2), name="planner")],
                 },
                 goto=next_node
             )
-        else:
-            next_node = "supervisor"
-        
-        return Command(
-            update={
-                "current_plan": new_plan,
-                'current_step_index': "G1-A1",
-                "messages": [HumanMessage(content=json.dumps(plan_content, ensure_ascii=False, indent=2), name="planner")],
-            },
-            goto=next_node
-        )
-            
+                

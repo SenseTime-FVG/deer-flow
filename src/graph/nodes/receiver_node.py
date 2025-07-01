@@ -67,7 +67,6 @@ class ReceiverNode(BaseNode):
         }
         
         # 记录已询问用户的次数
-        self.asked_count = 0
         self.max_ask_limit = 5 
 
     async def execute(self, state: Dict[str, Any], config: RunnableConfig) -> Command[Literal["supervisor"]]:

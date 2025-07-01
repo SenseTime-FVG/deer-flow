@@ -15,6 +15,7 @@ from src.tools.tavily_search.tavily_search_results_with_images import (
     TavilySearchResultsWithImages,
 )
 
+from src.tools.volcano_search.volcano_search_results import VolcanoSearchResults
 from src.tools.decorators import create_logged_tool
 
 logger = logging.getLogger(__name__)
@@ -24,10 +25,12 @@ LoggedTavilySearch = create_logged_tool(TavilySearchResultsWithImages)
 LoggedDuckDuckGoSearch = create_logged_tool(DuckDuckGoSearchResults)
 LoggedBraveSearch = create_logged_tool(BraveSearch)
 LoggedArxivSearch = create_logged_tool(ArxivQueryRun)
+LoggedVolcanoSearch = create_logged_tool(VolcanoSearchResults)
 
 
 # Get the selected search tool
 def get_web_search_tool(max_search_results: int):
+    logger.info(f"search engine:{SELECTED_SEARCH_ENGINE}")
     if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY.value:
         return LoggedTavilySearch(
             name="web_search",
@@ -39,6 +42,7 @@ def get_web_search_tool(max_search_results: int):
     elif SELECTED_SEARCH_ENGINE == SearchEngine.DUCKDUCKGO.value:
         return LoggedDuckDuckGoSearch(name="web_search", max_results=max_search_results)
     elif SELECTED_SEARCH_ENGINE == SearchEngine.BRAVE_SEARCH.value:
+        
         return LoggedBraveSearch(
             name="web_search",
             search_wrapper=BraveSearchWrapper(
@@ -55,6 +59,11 @@ def get_web_search_tool(max_search_results: int):
                 load_all_available_meta=True,
             ),
         )
+    elif SELECTED_SEARCH_ENGINE == SearchEngine.VOLCANO.value:
+        return LoggedVolcanoSearch(
+            name="web_search",
+            max_results=max_search_results,
+        )
     else:
         raise ValueError(f"Unsupported search engine: {SELECTED_SEARCH_ENGINE}")
 
@@ -65,7 +74,7 @@ def filter_garbled_text(text):
     :return: 过滤后的字符串
     """
     # 使用正则表达式匹配乱码内容
-    pattern = re.compile(r'[^\u4e00-\u9fa5a-zA-Z0-9\ufe30\uffa0-\uffa9\uff3f\uff00-\uffa0\u2000-\u206f\u3000-\u303f\ufb00-\uffa0]+')
+    pattern = re.compile(r'[^\u4e00-\u9fa5a-zA-Z0-9\s\ufe30\uffa0-\uffa9\uff3f\uff00-\uffa0\u2000-\u206f\u3000-\u303f\ufb00-\uffa0,.?!:;\'"()\[\]{}\/<>@#$%^&*_+\-=]+')
     filtered_text = re.sub(pattern, '', text)
     return filtered_text
 

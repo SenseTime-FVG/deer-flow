@@ -54,11 +54,15 @@ class BaseNode(ABC):
         for item in message: 
             if item.type != "system":
                 logger.info(f"角色: {item.type}")
+                
                 logger.info(f"内容: {item.content}")
+                    
                 if 'additional_kwargs' in item:
                     logger.info(f"附加参数: {item.additional_kwargs}")
                 if 'response_metadata' in item:
                     logger.info(f"响应元数据: {item.response_metadata}")
+                if 'tool_calls' in item:
+                    logger.info(f"tool calls: {item.tool_calls}")
                 logger.info("-" * 50)
 
     def log_tool_call(self, response: str, iterate_times: int):

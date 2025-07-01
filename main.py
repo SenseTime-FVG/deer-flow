@@ -22,13 +22,15 @@ def get_all_file_paths(folder_path):
             file_paths.append(full_path)
     return file_paths
 
-def ask(
+async def ask(
     question,
     files,
+    output_path,
     debug=False,
     max_plan_iterations=1,
     max_step_num=3,
     enable_background_investigation=True,
+    
 ):
     """Run the agent workflow with the given question.
 
@@ -51,16 +53,24 @@ def ask(
             user_input.append({'type': "file_url", 'file_url': {'url': f}})
     else:
         user_input = question
-    asyncio.run(
-        run_agent_workflow_async(
-            user_input=user_input,
-            debug=debug,
-            max_plan_iterations=max_plan_iterations,
-            max_step_num=max_step_num,
-            enable_background_investigation=enable_background_investigation,
-        )
+    # asyncio.run(
+    #     run_agent_workflow_async(
+    #         user_input=user_input,
+    #         debug=debug,
+    #         max_plan_iterations=max_plan_iterations,
+    #         max_step_num=max_step_num,
+    #         enable_background_investigation=enable_background_investigation,
+    #         output_path=output_path
+    #     )
+    # )
+    await run_agent_workflow_async(
+        user_input=user_input,
+        debug=debug,
+        max_plan_iterations=max_plan_iterations,
+        max_step_num=max_step_num,
+        enable_background_investigation=enable_background_investigation,
+        output_path=output_path
     )
-
 
 def main(
     debug=False,

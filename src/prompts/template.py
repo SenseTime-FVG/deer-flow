@@ -8,6 +8,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from langgraph.prebuilt.chat_agent_executor import AgentState
 from src.config.configuration import Configuration
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, SystemMessage
+from pathlib import Path
 # Initialize Jinja2 environment
 env = Environment(
     loader=FileSystemLoader(os.path.dirname(__file__)),
@@ -61,5 +62,35 @@ def apply_prompt_template(
         system_prompt = template.render(**state_vars)
     
         return [SystemMessage(content=system_prompt)] + state["messages"]
+    except Exception as e:
+        raise ValueError(f"Error applying template {prompt_name}: {e}")
+
+
+def simulate_user_template(
+    prompt_name: str, state: AgentState, ai_content: str
+) -> list:
+    """
+    Apply template variables to a prompt template and return formatted messages.
+
+    Args:
+        prompt_name: Name of the prompt template to use
+        state: Current agent state containing variables to substitute
+        ai_content: the content of ai ask user
+
+    Returns:
+        List of messages with the system prompt as the first message
+    """
+   
+    try:
+        # 获取当前文件的 Path 对象
+        current_file = Path(__file__).resolve()
+
+        # 获取当前文件所在的目录
+        current_dir = current_file.parent
+        # 获取system prompt
+        with open(os.path.join(current_dir, f"{prompt_name}.md"), "r", encoding="utf-8") as f:
+            system_prompt = f.read()
+    
+        return [SystemMessage(content=system_prompt)] + state['messages'] + [HumanMessage(content=ai_content)]
     except Exception as e:
         raise ValueError(f"Error applying template {prompt_name}: {e}")

@@ -66,9 +66,11 @@ class SearcherNode(BaseNode):
         messages = apply_prompt_template(self.name, state, configurable)
         # 准备委托工具
         tools = [self.call_supervisor, self.webSearchTool]
+        print("searcher input:\n")
         self.log_input_message(messages)
         llm = get_llm_by_type( self.config.llm_type).bind_tools(tools)
         response = llm.invoke(messages)
+        print(f"searcher output:{response}")
 
         node_res_summary = ""
 
@@ -82,10 +84,10 @@ class SearcherNode(BaseNode):
             for tool_call in response.tool_calls:
                 # 返回给supervisor
                 if tool_call["name"] == "display_result":
-                    node_res_summary += f"\n{tool_call['args']['result']}"
+                    node_res_summary += f"{tool_call['args']['result']}"
                     return Command(
                         update={
-                            "messages": [HumanMessage(content=node_res_summary, name="writer")],
+                            "messages": [HumanMessage(content=json.dumps({"results":node_res_summary}, ensure_ascii=False), name="searcher")],
                             "supervisor_iterate_time": supervisor_iterate_time + 1,
                             "tool_call_iterate_time" : 0
                         },
@@ -94,20 +96,20 @@ class SearcherNode(BaseNode):
                 elif tool_call["name"] == "web_search":
                     from src.tools.search import get_web_search_tool, filter_garbled_text
 
-                    background_summary = "相关背景信息收集:\n"
+                    background_summary = ""
                     search_engine = get_web_search_tool(configurable.max_search_results)
                     try:
                         
                         searched_content = search_engine.invoke(tool_call["args"])
                         for elem in searched_content:
-                            background_summary += f"- 题目：{ elem["title"]}\n- 内容：{elem["content"]}\n"
+                            background_summary += f"Title：{ elem["title"]}\n content：{elem["content"]}\n"
                         
                     except Exception as e:
                         self.log_execution(f"Background research failed: {e}")
                     background_summary = filter_garbled_text(background_summary)
                     return Command(
                         update={
-                            "messages": [ToolMessage(content=background_summary, tool_call_id=tool_call["id"])],
+                            "messages": [response, ToolMessage(content=json.dumps({"search_results": background_summary.strip()}, ensure_ascii=False), tool_call_id=tool_call["id"])],
                             "tool_call_iterate_time" : iterate_times
                         },
                         goto="searcher"

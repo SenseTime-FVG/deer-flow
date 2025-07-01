@@ -13,10 +13,12 @@ class SearchEngine(enum.Enum):
     DUCKDUCKGO = "duckduckgo"
     BRAVE_SEARCH = "brave_search"
     ARXIV = "arxiv"
+    VOLCANO = "volcano"
 
 
 # Tool configuration
-SELECTED_SEARCH_ENGINE = os.getenv("SEARCH_API", SearchEngine.TAVILY.value)
+SELECTED_SEARCH_ENGINE = "volcano" # os.getenv("SEARCH_API", SearchEngine.VOLCANO.value)
+print(SELECTED_SEARCH_ENGINE)
 
 
 class RAGProvider(enum.Enum):

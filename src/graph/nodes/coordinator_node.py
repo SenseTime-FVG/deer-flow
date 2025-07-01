@@ -3,7 +3,7 @@
 
 import json
 from .base_node import BaseNode
-from src.prompts.template import apply_prompt_template
+from src.prompts.template import apply_prompt_template, simulate_user_template
 from src.config.agents import AgentConfiguration
 from src.llms.llm import get_llm_by_type
 from langchain_core.messages import AIMessage, ToolMessage, HumanMessage
@@ -128,6 +128,8 @@ class CoordinatorNode(BaseNode):
     
         # 执行节点标准流程 
         configurable = Configuration.from_runnable_config(config)
+        print(state)
+        print(configurable)
         messages = apply_prompt_template(self.name, state, configurable)
         self.log_input_message(messages)
         llm = get_llm_by_type(self.config.llm_type).bind_tools(self.tools)
@@ -155,40 +157,56 @@ class CoordinatorNode(BaseNode):
                 elif tool_call["name"] == "web_search":
                     from src.tools.search import get_web_search_tool, filter_garbled_text
 
-                    background_summary = "相关背景信息收集:\n"
+                    background_summary = ""
                     search_engine = get_web_search_tool(configurable.max_search_results)
                     try:
-                        
+                        self.log_execution(f"search query:{tool_call["args"]}")
                         searched_content = search_engine.invoke(tool_call["args"])
+                        self.log_execution(f"search content:{searched_content}")
                         for elem in searched_content:
-                            background_summary += f"- 题目：{ elem["title"]}\n- 内容：{elem["content"]}\n"
+                            background_summary += f"Title:{ elem["title"]}\n content:{elem["content"]}\n"
                         
                     except Exception as e:
                         self.log_execution(f"Background research failed: {e}")
                     background_summary = filter_garbled_text(background_summary)
                     return Command(
                         update={
-                            "messages": [ToolMessage(content=background_summary, tool_call_id=tool_call["id"])],
+                            "messages": [response, ToolMessage(content=json.dumps({"web_search_result": background_summary.strip()}, ensure_ascii=False, indent=2), tool_call_id=tool_call["id"])],
                             "tool_call_iterate_time" : iterate_times
                         },
                         goto="coordinator"
                     )
 
                 elif tool_call["name"] == "message_ask_user":
-                    feedback = str(interrupt(tool_call["args"]["text"]))
-                    # 整理feedback 返回节点
-                    feedback_query = f"Human feedback: {feedback}"
+                    
+                    #调用 chatopenai接口模拟
+                    if state.get("use_llm_simulate_user", False):
+                        user_llm = get_llm_by_type("basic")
+                        
+                        ask_user_messsages = simulate_user_template("simulate_user", state, response.tool_calls[0]['args'].get("text"))
+                        human_feedback = user_llm.invoke(ask_user_messsages)
+                        # 整理feedback 返回节点
+                        feedback_query = human_feedback.content
+                        print(f"AI 模拟人类返回：{human_feedback}")
+                    else:
+                        # 与用户交互获取
+                        feedback = str(interrupt(tool_call["args"]["text"]))
+                        feedback_query = feedback
+
                     return Command(
                         update={
                             "messages": [response,
-                                ToolMessage(content=feedback_query, tool_call_id=tool_call["id"])],
+                                ToolMessage(content=json.dumps({"human_feedback":feedback_query}, ensure_ascii=False, indent=2), tool_call_id=tool_call["id"])],
                             "tool_call_iterate_time" : iterate_times
                         },
                         goto="coordinator"
                     )
+                else:
+                    self.log_execution("tool call not exist, complete dialogue directly")
+                    return {'final_report': response.content}
         else:
             self.log_execution("NO tool call, complete dialogue directly")
-        
+            return {'final_report': response.content}
             goto = "__end__"
             return Command(
                 update={

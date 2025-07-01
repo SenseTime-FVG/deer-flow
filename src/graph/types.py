@@ -29,5 +29,14 @@ class State(MessagesState):
     supervisor_iterate_time: int = 0 # supervisor_iterate_time
     history_clear: bool = False # 是否清空
 
+    # 是否需要中断进行数据收集
+    is_break: bool = False
+    planner_node_capture: bool = False
+    
+    # 是否使用llm模拟用户回答
+    use_llm_simulate_user: bool = False
+    
+    
     file_info: str
     need_image: str = "true"
+    
