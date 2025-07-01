@@ -14,6 +14,7 @@ class SearchEngine(enum.Enum):
     BRAVE_SEARCH = "brave_search"
     ARXIV = "arxiv"
     VOLCANO = "volcano"  # 新增火山引擎
+    SOGOU = "sogou" # 新增搜狗搜索
 
 
 # Tool configuration
