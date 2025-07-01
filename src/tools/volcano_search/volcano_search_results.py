@@ -39,7 +39,7 @@ class VolcanoSearchResults(BaseTool):
         images: Optional[List[Union[str, Dict]]] = None,
         run_manager: Optional[CallbackManagerForToolRun] = None,
         **kwargs
-    ) -> Tuple[Union[List[Dict[str, str]], str], Dict]:
+    ) -> List[Dict[str, str]]:
         """
         同步执行搜索，自动识别搜索类型
         
@@ -70,12 +70,12 @@ class VolcanoSearchResults(BaseTool):
             cleaned_results = self.api_wrapper.clean_results(raw_results)
             
             logger.info(f"同步{search_type}完成，返回 {len(cleaned_results)} 个结果")
-            return cleaned_results, raw_results
+            return cleaned_results
             
         except Exception as e:
             error_msg = f"火山引擎搜索失败: {str(e)}"
             logger.error(error_msg)
-            return error_msg, {"error": error_msg}
+            return error_msg
     
     async def _arun(
         self,
@@ -83,7 +83,7 @@ class VolcanoSearchResults(BaseTool):
         images: Optional[List[Union[str, Dict]]] = None,
         run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
         **kwargs
-    ) -> Tuple[Union[List[Dict[str, str]], str], Dict]:
+    ) -> List[Dict[str, str]]:
         """
         异步执行搜索，自动识别搜索类型
         
@@ -114,12 +114,12 @@ class VolcanoSearchResults(BaseTool):
             cleaned_results = self.api_wrapper.clean_results(raw_results)
             
             logger.info(f"异步{search_type}完成，返回 {len(cleaned_results)} 个结果")
-            return cleaned_results, raw_results
+            return cleaned_results
             
         except Exception as e:
             error_msg = f"火山引擎异步搜索失败: {str(e)}"
             logger.error(error_msg)
-            return error_msg, {"error": error_msg}
+            return error_msg
 
 
 if __name__ == "__main__":
@@ -145,9 +145,8 @@ if __name__ == "__main__":
                     "query": "查找资料并生成2012—2023年中国人口数据的真实数据，要求有年份，人口总数，出生人口，死亡人口。"
                 }
             )
-            print(f"文本搜索结果: {len(text_results[0]) if isinstance(text_results[0], list) else '错误'} 个结果")
-            if isinstance(text_results[0], list) and len(text_results[0]) > 0:
-                for i, result in enumerate(text_results[0]):
+            if isinstance(text_results, list) and len(text_results) > 0:
+                for i, result in enumerate(text_results):
                     print(f"第{i+1}个结果:")
                     print(result)
         except Exception as e:
@@ -165,9 +164,8 @@ if __name__ == "__main__":
                     "images": ["/mnt/afs/shaoyuyao/code/agent/test/images/07708079f24c7ffc54815f45be1fb8839870763-c3f1-43cd-9482-0ee91.jpg"]
                 }
             )
-            print(f"图像搜索结果: {len(image_results[0]) if isinstance(image_results[0], list) else '错误'} 个结果")
-            if isinstance(image_results[0], list) and len(image_results[0]) > 0:
-                for i, result in enumerate(image_results[0]):
+            if isinstance(image_results, list) and len(image_results) > 0:
+                for i, result in enumerate(image_results):
                     print(f"第{i+1}个结果:")
                     print(result)
         except Exception as e:
