@@ -58,7 +58,7 @@ class SearcherNode(BaseNode):
             }
         }
 
-    async def execute(self, state: Dict[str, Any], config: RunnableConfig) -> Command[Literal["supervisor"]]:
+    async def execute(self, state: Dict[str, Any], config: RunnableConfig) -> Command[Literal["__end__"]]:  # Command[Literal["supervisor"]]
         
         configurable = Configuration.from_runnable_config(config)
         supervisor_iterate_time = state["supervisor_iterate_time"]
@@ -67,7 +67,8 @@ class SearcherNode(BaseNode):
         # 准备委托工具
         tools = [self.call_supervisor, self.webSearchTool]
         print("searcher input:\n")
-        self.log_input_message(messages)
+        print(messages)
+        # self.log_input_message(messages)
         llm = get_llm_by_type( self.config.llm_type).bind_tools(tools)
         response = llm.invoke(messages)
         print(f"searcher output:{response}")
@@ -85,14 +86,23 @@ class SearcherNode(BaseNode):
                 # 返回给supervisor
                 if tool_call["name"] == "display_result":
                     node_res_summary += f"{tool_call['args']['result']}"
-                    return Command(
+                    if state.get("is_select_searcher"):
+                        print(True)
+                        return Command(
                         update={
-                            "messages": [HumanMessage(content=json.dumps({"results":node_res_summary}, ensure_ascii=False), name="searcher")],
-                            "supervisor_iterate_time": supervisor_iterate_time + 1,
+                            "messages": [response, HumanMessage(content=json.dumps({"results":node_res_summary}, ensure_ascii=False), name="searcher")],
                             "tool_call_iterate_time" : 0
                         },
-                        goto="supervisor"
+                        goto="__end__"
                     )
+                    else:
+                        return Command(
+                            update={
+                                "messages": [HumanMessage(content=json.dumps({"results":node_res_summary}, ensure_ascii=False), name="searcher")],
+                                "tool_call_iterate_time" : 0
+                            },
+                            goto="supervisor"
+                        )
                 elif tool_call["name"] == "web_search":
                     from src.tools.search import get_web_search_tool, filter_garbled_text
 
@@ -102,11 +112,12 @@ class SearcherNode(BaseNode):
                         
                         searched_content = search_engine.invoke(tool_call["args"])
                         for elem in searched_content:
-                            background_summary += f"Title：{ elem["title"]}\n content：{elem["content"]}\n"
+                            background_summary += f"Title：{ elem["title"]}\ncontent：{elem["content"]}\n"
                         
                     except Exception as e:
                         self.log_execution(f"Background research failed: {e}")
                     background_summary = filter_garbled_text(background_summary)
+                    print(background_summary)
                     return Command(
                         update={
                             "messages": [response, ToolMessage(content=json.dumps({"search_results": background_summary.strip()}, ensure_ascii=False), tool_call_id=tool_call["id"])],
@@ -121,7 +132,7 @@ class SearcherNode(BaseNode):
                 "messages": response,
                 "supervisor_iterate_time": supervisor_iterate_time + 1
             },
-            goto="supervisor"
+            goto="__end__"
         )
 
     

@@ -33,6 +33,9 @@ class State(MessagesState):
     is_break: bool = False
     planner_node_capture: bool = False
     
+    # 是否生产searcher数据
+    is_select_searcher: bool = False
+    
     # 是否使用llm模拟用户回答
     use_llm_simulate_user: bool = False
     

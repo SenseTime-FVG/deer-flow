@@ -148,7 +148,7 @@ class CoordinatorNode(BaseNode):
                     # 这里直接给planner
                     return Command(
                         update={
-                            "messages": [HumanMessage(content=json.dumps(tool_call["args"], ensure_ascii=False, indent=2), name="coordinator")],
+                            "messages": [HumanMessage(content=json.dumps(tool_call["args"], ensure_ascii=False), name="coordinator")],
                             "tool_call_iterate_time" : 0
                         },
                         goto="planner"
@@ -171,7 +171,7 @@ class CoordinatorNode(BaseNode):
                     background_summary = filter_garbled_text(background_summary)
                     return Command(
                         update={
-                            "messages": [response, ToolMessage(content=json.dumps({"web_search_result": background_summary.strip()}, ensure_ascii=False, indent=2), tool_call_id=tool_call["id"])],
+                            "messages": [response, ToolMessage(content=json.dumps({"web_search_result": background_summary.strip()}, ensure_ascii=False), tool_call_id=tool_call["id"])],
                             "tool_call_iterate_time" : iterate_times
                         },
                         goto="coordinator"

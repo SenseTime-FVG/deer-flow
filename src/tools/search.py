@@ -14,7 +14,7 @@ from src.config import SearchEngine, SELECTED_SEARCH_ENGINE
 from src.tools.tavily_search.tavily_search_results_with_images import (
     TavilySearchResultsWithImages,
 )
-
+from src.tools.sogou_search.sogou_search_results import SogouSearchResults
 from src.tools.volcano_search.volcano_search_results import VolcanoSearchResults
 from src.tools.decorators import create_logged_tool
 
@@ -26,6 +26,7 @@ LoggedDuckDuckGoSearch = create_logged_tool(DuckDuckGoSearchResults)
 LoggedBraveSearch = create_logged_tool(BraveSearch)
 LoggedArxivSearch = create_logged_tool(ArxivQueryRun)
 LoggedVolcanoSearch = create_logged_tool(VolcanoSearchResults)
+LoggedSogouSearch = create_logged_tool(SogouSearchResults)
 
 
 # Get the selected search tool
@@ -61,6 +62,11 @@ def get_web_search_tool(max_search_results: int):
         )
     elif SELECTED_SEARCH_ENGINE == SearchEngine.VOLCANO.value:
         return LoggedVolcanoSearch(
+            name="web_search",
+            max_results=max_search_results,
+        )
+    elif SELECTED_SEARCH_ENGINE == SearchEngine.SOGOU.value:
+        return LoggedSogouSearch(
             name="web_search",
             max_results=max_search_results,
         )

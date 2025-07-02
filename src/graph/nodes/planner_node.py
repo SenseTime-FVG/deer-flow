@@ -23,6 +23,8 @@ class PlannerNode(BaseNode):
     def __init__(self, toolmanager):
         super().__init__("planner", AgentConfiguration.NODE_CONFIGS["planner"], toolmanager)
         
+    def getfirst_action(plan: Plan) -> str:
+        """获取计划中的第一个动作"""
 
     async def execute(self, state: Dict[str, Any], config: RunnableConfig) \
         -> Command[Literal["writer", "coder", "interpreter", "searcher", "reader", "reporter", "receiver", "__end__"]]:

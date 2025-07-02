@@ -5,7 +5,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 from typing import Literal, Dict, Any
 from src.prompts.template import apply_prompt_template
-from src.prompts.planner_model import Plan
+from src.prompts.planner_model import Plan, TaskStatus
 import logging
 
 logger = logging.getLogger(__name__)
@@ -132,13 +132,13 @@ class SupervisorNode(BaseNode):
         configurable = Configuration.from_runnable_config(config)
         if not self.current_plan:
             self.current_plan = state.get("current_plan")
-
         current_step_index = state.get("current_step_index")
-        current_action, next_action  = self.get_step_state(self.current_plan, current_step_index)
-        current_messages = state["messages"]
+        current_action = self.get_action(self.current_plan, current_step_index)
+
         current_step_res = state["messages"][-1].content
 
-        current_task_summary = f"# Action Task:\n{current_action.description}\n# Action condition:\n{current_step_res}"
+        current_task_summary = f"### action_id\n{current_step_index}\n\n### result\n{current_step_res}"
+        self.log_execution(f"[Supervisor action summary]:\n {current_task_summary}")
         supervisor_state = {
             "messages": [HumanMessage(content=current_task_summary)],
             "locale": state.get("locale", "en-US"),
@@ -177,17 +177,18 @@ class SupervisorNode(BaseNode):
                     )
                 
                 elif action == "complete":
-
-                    if next_action == {}:
+                    next_action = self.get_next_action(self.current_plan, current_step_index)
+                    
+                    if next_action:
                         # 全部任务完成，汇总信息返回
                         self.log_execution(f"Plan complete")
-                        self.plan_update(current_step_index, current_step_res)
+                        self.update_plan_action_status(self.current_plan, current_step_index, TaskStatus.COMPLETED, current_step_res)
                         return {"final_report": current_step_res}
 
                     else:
                         # 任务完成继续任务
                         self.log_execution(f"Step {current_step_index} complete")
-                        self.plan_update(current_step_index, current_step_res)
+                        self.update_plan_action_status(self.current_plan, current_step_index, TaskStatus.COMPLETED, current_step_res)
                         self.log_execution("supervisor plan update")
                         # self.log_execution(self.current_plan)
                         next_node = AgentConfiguration.STEP_TYPE_TO_NODE[next_action.type.lower()]
@@ -196,7 +197,8 @@ class SupervisorNode(BaseNode):
                         # )
                         self.log_execution(f"next_node: {next_node}")
                         self.log_execution(f"next_action: {next_action}")
-                        next_step_summary = self.get_next_step(next_action)
+                        next_step_summary = self.get_action_with_dependencies_json(self.current_plan, next_action.id)
+                        self.log_execution(f"next_step_summary: {next_step_summary}")
                         return Command(
                             update={
                                 "messages": [RemoveMessage(id="__remove_all__"), 

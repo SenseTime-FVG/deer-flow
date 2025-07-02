@@ -18,7 +18,7 @@ from .nodes import (
     ReporterNode,  
     ReceiverNode
 )
-
+from langchain_core.messages import HumanMessage
 import logging
 
 logger = logging.getLogger(__name__)
@@ -77,5 +77,52 @@ def build_graph():
     return builder.compile()
 
 
-# graph = build_graph()
-# graph = build_graph_with_memory()
+def build_graph_from_config(compile_args):
+    builder = _build_base_graph()
+    return builder.compile(**compile_args)
+
+
+def build_searcher_subgraph_with_memory():
+    """
+    构建并返回一个带有记忆功能的 Searcher 节点子图。
+    该子图在达到 'supervisor' 状态时结束。
+    """
+    # 实例化 MemorySaver，用于在内存中保存图的状态
+    memory_builder = MemorySaver()
+
+    # 构建状态图
+    builder_searcher = StateGraph(State)
+
+    tool_manager = ToolManager()
+    searcher_node = SearcherNode(tool_manager)
+    # supervisor_node = SupervisorNode(tool_manager)
+
+    builder_searcher.add_node("searcher", searcher_node.execute)
+    # builder_searcher.add_node("supervisor", supervisor_node.execute)
+    # 设置入口点
+    builder_searcher.set_entry_point("searcher")
+
+    # 定义条件边，根据 SearcherNode 的 Command.goto 决定流向
+    builder_searcher.add_conditional_edges(
+        "searcher",
+        lambda x: decide_next_node(x), # 这个lambda函数直接返回节点执行后Command.goto的值
+        {
+            "searcher": "searcher", # 如果返回 "searcher"，则循环回 "searcher" 节点
+            "__end__": END,         # 如果返回 "__end__"，则子图结束
+        },
+    )
+
+    # 编译图，并将 MemorySaver 实例作为 checkpointer 传入
+    return builder_searcher.compile(checkpointer=memory_builder)
+
+def decide_next_node(x):
+    # print(f"返回值：{x}")  # 保留你的打印方便调试
+
+    # 举例：如果 tool message 里有“search_results”，就继续搜
+    if isinstance(x, dict):
+        messages = x.get("messages", [])
+        last_message = messages[-1]
+        if "search_results" in last_message.content:
+            return "searcher"
+        else:
+            return "__end__"

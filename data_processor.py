@@ -17,7 +17,9 @@ async def process_single_query(
     max_plan_iterations,
     max_step_num,
     enable_background_investigation,
-    semaphore, # 新增信号量参数
+    semaphore, 
+    is_break_for_plan,
+    is_select_searcher
 ):
     """处理单个查询的异步函数，并使用信号量控制并发"""
     async with semaphore: # 进入信号量，当达到并发上限时会等待
@@ -34,11 +36,13 @@ async def process_single_query(
         await ask( # 直接 await ask，因为我们在这里处理单个任务
             question=query,
             files=files_to_process,
-            debug=debug,
             max_plan_iterations=max_plan_iterations,
             max_step_num=max_step_num,
+            debug=debug,
             enable_background_investigation=enable_background_investigation,
-            output_path=output_path
+            output_path=output_path,
+            is_select_searcher=is_select_searcher,
+            is_break_for_plan=is_break_for_plan
         )
         logger.info(f"Finished Query: '{query}'")
 
@@ -49,7 +53,9 @@ async def process_query_from_jsonl_limited_concurrency(
     max_plan_iterations: int = 1,
     max_step_num: int = 3,
     enable_background_investigation: bool = True,
-    concurrency_limit: int = 5, # 新增并发限制参数
+    concurrency_limit: int = 5, 
+    is_break_for_plan: bool=False,
+    is_select_searcher:bool=False
 ):
     """
     Reads queries and file paths from a JSONL file and processes them with a limited concurrency.
@@ -114,6 +120,8 @@ async def process_query_from_jsonl_limited_concurrency(
                         max_step_num,
                         enable_background_investigation,
                         semaphore,
+                        is_break_for_plan,
+                        is_select_searcher
                     )
                 )
             except json.JSONDecodeError:
@@ -171,6 +179,18 @@ if __name__ == "__main__":
         default=5, # 默认并发限制为 5
         help="Maximum number of concurrent tasks (default: 5).",
     )
+    parser.add_argument(
+        "--is_break_for_plan",
+        type=bool,
+        default=False, 
+        help="是否需要中断workflow收集planner数据，生产planner数据时为True",
+    )
+    parser.add_argument(
+        "--is_select_searcher",
+        type=bool,
+        default=False, 
+        help="是否进行生产searcher数据, 默认为False",
+    )
 
     args = parser.parse_args()
 
@@ -183,5 +203,7 @@ if __name__ == "__main__":
             max_step_num=args.max_step_num,
             enable_background_investigation=args.enable_background_investigation,
             concurrency_limit=args.concurrency_limit,
+            is_break_for_plan=args.is_break_for_plan,
+            is_select_searcher=args.is_select_searcher
         )
     )

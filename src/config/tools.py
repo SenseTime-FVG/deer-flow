@@ -14,10 +14,11 @@ class SearchEngine(enum.Enum):
     BRAVE_SEARCH = "brave_search"
     ARXIV = "arxiv"
     VOLCANO = "volcano"
+    SOGOU = "sogou" 
 
 
 # Tool configuration
-SELECTED_SEARCH_ENGINE = "volcano" # os.getenv("SEARCH_API", SearchEngine.VOLCANO.value)
+SELECTED_SEARCH_ENGINE = "sogou" # os.getenv("SEARCH_API", SearchEngine.VOLCANO.value)
 print(SELECTED_SEARCH_ENGINE)
 
 
