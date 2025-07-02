@@ -54,7 +54,7 @@ def resources2user_input(resources: list[dict]) -> str:
     Returns:
         The user input string
     """
-    resources = deepcopy(resources)
+    # resources = deepcopy(resources)
     # [{
     #     'uri': file,
     #     'title': os.path.basename(file),
@@ -69,11 +69,15 @@ def resources2user_input(resources: list[dict]) -> str:
         # 判断文件类型
         if file_extension in ["jpg", "jpeg", "png", "gif", "bmp", "webp"]:  # 图片文件类型
             file_content = image_to_caption(resource["uri"])
+            file_content_format = f"<file><id>{idx}</id><name>{resource["uri"]}</name><content>{file_content}\n</content></file>\n"
+            resource["content"] = file_content_format
         elif file_extension in ["pdf", "docx", "pptx", "xlsx"]:
             file_content = file_to_text(resource["uri"]) 
+            file_content_format = f"<file><id>{idx}</id><name>{resource["uri"]}</name><content>{file_content}\n</content></file>\n"
+            resource["content"] = file_content_format
         else:
             raise ValueError("未知文件类型")
 
-        res_str += f"<file><id>{idx}</id><name>{resource["uri"]}</name><content>{file_content}\n</content></file>\n"
+        res_str += file_content_format
 
     return res_str

@@ -523,6 +523,7 @@ dependencies = [
     { name = "readabilipy" },
     { name = "socksio" },
     { name = "sse-starlette" },
+    { name = "tencentcloud-sdk-python" },
     { name = "uvicorn" },
     { name = "yfinance" },
 ]
@@ -566,6 +567,7 @@ requires-dist = [
     { name = "readabilipy", specifier = ">=0.3.0" },
     { name = "socksio", specifier = ">=1.0.0" },
     { name = "sse-starlette", specifier = ">=1.6.5" },
+    { name = "tencentcloud-sdk-python" },
     { name = "uvicorn", specifier = ">=0.27.1" },
     { name = "yfinance", specifier = ">=0.2.54" },
 ]
@@ -2586,6 +2588,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/0a/d4/2b0cd0fe285e14b36db076e78c93766ff1d529d70408bd1d2a5a84f1d929/tenacity-9.1.2.tar.gz", hash = "sha256:1169d376c297e7de388d18b4481760d478b0e99a777cad3a9c86e556f4b697cb", size = 48036, upload-time = "2025-04-02T08:25:09.966Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e5/30/643397144bfbfec6f6ef821f36f33e57d35946c44a2352d3c9f0ae847619/tenacity-9.1.2-py3-none-any.whl", hash = "sha256:f77bf36710d8b73a50b2dd155c97b870017ad21afe6ab300326b0371b3b05138", size = 28248, upload-time = "2025-04-02T08:25:07.678Z" },
+]
+
+[[package]]
+name = "tencentcloud-sdk-python"
+version = "3.0.1412"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4c/25/9599aae307a31234782a3a972e54a016ad3963a039b695a171a21a0df720/tencentcloud-sdk-python-3.0.1412.tar.gz", hash = "sha256:2eff27f4e1863f8fa81d531498b49c62828acb5e962f9605c8ef6861f544dcdc", size = 11976219, upload-time = "2025-06-29T20:47:42.704Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8c/37/fb722f570cb6c687c31c1c18f6330426d10479d71a9a685e64e8d08acf7b/tencentcloud_sdk_python-3.0.1412-py2.py3-none-any.whl", hash = "sha256:621ab56de52d128b4164347232fa43cfba60a46a7f3e13534a6c2fc9372535ea", size = 12718541, upload-time = "2025-06-29T20:47:27.303Z" },
 ]
 
 [[package]]

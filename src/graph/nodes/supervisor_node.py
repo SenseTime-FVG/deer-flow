@@ -67,18 +67,21 @@ class SupervisorNode(BaseNode):
         current_step_res = state["messages"][-1].content
 
         current_task_summary = f"### action_id\n{current_step_index}\n\n### result\n{current_step_res}"
-        self.log_execution(f"[Supervisor action summary]:\n {current_task_summary}")
+        # self.log_execution(f"[Supervisor action summary]:\n {current_task_summary}")
         supervisor_state = {
             "messages": [HumanMessage(content=current_task_summary)],
             "locale": state.get("locale", "en-US"),
-            "resources": state.get("resources", [])
+            "resources": state.get("resources", []),
+            "supervisor_iterate_time": state.get("supervisor_iterate_time", 0),
+            "max_supervisor_iterate_times": configurable.max_supervisor_iterate_times
         }
+ 
         supervisor_input = apply_prompt_template("supervisor", supervisor_state, configurable)
 
         tools = [self.adviseTool, self.completeTool]
         # 使用LLM进行评估
         llm = get_llm_by_type(self.config.llm_type).bind_tools(tools)
-        
+        self.log_input_message(supervisor_input)
         response = llm.invoke(supervisor_input)
         self.log_execution(response)
         # max_supervisor_iterate_times = configurable.max_supervisor_iterate_times
@@ -126,7 +129,7 @@ class SupervisorNode(BaseNode):
                         # )
                         self.log_execution(f"next_node: {next_node}")
                         self.log_execution(f"next_action: {next_action}")
-                        next_step_summary = self.get_action_with_dependencies_json(self.current_plan, next_action.id)
+                        next_step_summary = self.get_action_with_dependencies_json(self.current_plan, next_action.id, state.get("resources", []))
                         self.log_execution(f"next_step_summary: {next_step_summary}")
                         return Command(
                             update={

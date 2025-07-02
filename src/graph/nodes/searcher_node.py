@@ -92,22 +92,14 @@ class SearcherNode(BaseNode):
                         goto="supervisor"
                     )
                 elif tool_call["name"] == "web_search":
-                    from src.tools.search import get_web_search_tool, filter_garbled_text
+                    from src.tools.search import get_web_search_tool
 
-                    background_summary = "相关背景信息收集:\n"
                     search_engine = get_web_search_tool(configurable.max_search_results)
-                    try:
-                        
-                        searched_content = search_engine.invoke(tool_call["args"])
-                        for elem in searched_content:
-                            background_summary += f"- 题目：{ elem["title"]}\n- 内容：{elem["content"]}\n"
-                        
-                    except Exception as e:
-                        self.log_execution(f"Background research failed: {e}")
-                    background_summary = filter_garbled_text(background_summary)
+                    searched_content = search_engine.invoke(tool_call["args"])
+
                     return Command(
                         update={
-                            "messages": [response, ToolMessage(content=background_summary, tool_call_id=tool_call["id"])],
+                            "messages": [response, ToolMessage(content=json.dumps({"search_results": searched_content}, ensure_ascii=False), tool_call_id=tool_call["id"])],
                             "tool_call_iterate_time" : iterate_times
                         },
                         goto="searcher"

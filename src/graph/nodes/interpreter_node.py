@@ -160,7 +160,7 @@ class InterpreterNode(BaseNode):
 
                     return Command(
                         update={
-                            "messages": [ToolMessage(content=ci_result, name="interpreter", tool_call_id=response.tool_call["id"])],
+                            "messages": [ToolMessage(content=ci_result, name="interpreter", tool_call_id=tool_call["id"])],
                             "tool_call_iterate_time" : iterate_times
                         },
                         goto="interpreter"
