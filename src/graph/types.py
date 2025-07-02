@@ -12,6 +12,8 @@ class State(MessagesState):
 
     # Runtime Variables
     locale: str = "en-US"
+    messages: list[dict] = []
+    current_instruction: str = None
     observations: list[str] = []
     resources: list[Resource] = []
     plan_iterations: int = 0

@@ -252,12 +252,11 @@ def coordinator_node(
 
 def reporter_node(state: State):
     """Reporter node that write a final report."""
-    logger.info("Reporter write final report")
-    current_plan = state.get("current_plan")
+    logger.info("inside reporter node")
     input_ = {
         "messages": [
             HumanMessage(
-                f"# Research Requirements\n\n## Task\n\n{current_plan.title}\n\n## Description\n\n{current_plan.thought}"
+                "来自Planner的指令" + state["current_instruction"]
             )
         ],
         "locale": state.get("locale", "en-US"),
@@ -265,18 +264,10 @@ def reporter_node(state: State):
     invoke_messages = apply_prompt_template("reporter", input_)
     observations = state.get("observations", [])
 
-    # Add a reminder about the new report format, citation style, and table usage
-    invoke_messages.append(
-        HumanMessage(
-            content="IMPORTANT: Structure your report according to the format in the prompt. Remember to include:\n\n1. Key Points - A bulleted list of the most important findings\n2. Overview - A brief introduction to the topic\n3. Detailed Analysis - Organized into logical sections\n4. Survey Note (optional) - For more comprehensive reports\n5. Key Citations - List all references at the end\n\nFor citations, DO NOT include inline citations in the text. Instead, place all citations in the 'Key Citations' section at the end using the format: `- [Source Title](URL)`. Include an empty line between each citation for better readability.\n\nPRIORITIZE USING MARKDOWN TABLES for data presentation and comparison. Use tables whenever presenting comparative data, statistics, features, or options. Structure tables with clear headers and aligned columns. Example table format:\n\n| Feature | Description | Pros | Cons |\n|---------|-------------|------|------|\n| Feature 1 | Description 1 | Pros 1 | Cons 1 |\n| Feature 2 | Description 2 | Pros 2 | Cons 2 |",
-            name="system",
-        )
-    )
-
     for observation in observations:
         invoke_messages.append(
             HumanMessage(
-                content=f"Below are some observations for the research task:\n\n{observation}",
+                content=f"Below are some observations for the task:\n\n{observation}",
                 name="observation",
             )
         )
@@ -285,8 +276,15 @@ def reporter_node(state: State):
     response_content = response.content
     logger.info(f"reporter response: {response_content}")
 
-    return {"final_report": response_content}
+    return Command(
+            update={"final_report": response_content},
+            goto='end',
+        )
 
+def end_node(state: State):
+    """End node that ends the workflow."""
+    logger.info("End node is ending the workflow.")
+    return {"final_report": state.get("final_report")}
 
 def research_team_node(
     state: State,
@@ -416,7 +414,7 @@ async def _execute_agent_step(
             ],
             "observations": observations + [response_content],
         },
-        goto="research_team",
+        goto="planner",
     )
 
 
@@ -463,7 +461,7 @@ async def _setup_and_execute_agent_step(
 
     # Create and execute agent with MCP tools if available
     if mcp_servers:
-        async with MultiServerMCPClient_wFileUpload(mcp_servers, state) as client:
+        async with MultiServerMCPClient_wFileUpload(mcp_servers) as client:
             loaded_tools = default_tools[:]
             for tool in client.get_tools():
                 if tool.name in enabled_tools:

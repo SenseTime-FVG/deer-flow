@@ -10,6 +10,8 @@ from src.graph import build_graph
 from src.utils.file_descriptors import file2resource, resources2user_input
 import uuid
 import shutil
+from langgraph.types import Command
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,  # Default level is INFO
@@ -123,13 +125,14 @@ async def run_agent_workflow_async(
             "thread_id": "default",
             "max_plan_iterations": max_plan_iterations,
             "max_step_num": max_step_num,
+            "max_search_results": 3,
             "mcp_settings": {
                 "servers": {
                     "doc_parser": {
                         "transport": "sse",
                         "url": "http://127.0.0.1:8010/sse",
                         "enabled_tools": ["parse_doc"],
-                        "add_to_agents": ["researcher", "coder"]
+                        "add_to_agents": ["doc_parser"]
                     }
                 }
             },
@@ -137,27 +140,35 @@ async def run_agent_workflow_async(
         "recursion_limit": 100,
     }
     last_message_cnt = 0
-    async for s in graph.astream(
-        input=initial_state, config=config, stream_mode="values"
-    ):
-        try:
-            if isinstance(s, dict) and "messages" in s:
-                if len(s["messages"]) <= last_message_cnt:
-                    continue
-                last_message_cnt = len(s["messages"])
-                message = s["messages"][-1]
-                if isinstance(message, tuple):
-                    print(message)
+    while True:
+        async for s in graph.astream(
+            input=initial_state, config=config, stream_mode="values"
+        ):
+            print('========= astream iteration =================')
+            try:
+                if isinstance(s, dict) and "messages" in s:
+                    if len(s["messages"]) <= last_message_cnt:
+                        continue
+                    last_message_cnt = len(s["messages"])
+                    message = s["messages"][-1]
+                    if isinstance(message, tuple):
+                        print(message)
+                    else:
+                        # message.pretty_print()
+                        print(message)
                 else:
-                    message.pretty_print()
-            else:
-                # For any other output format
-                print(f"Output: {s}")
-        except Exception as e:
-            logger.error(f"Error processing stream output: {e}")
-            print(f"Error processing output: {str(e)}")
-
-    logger.info("Async workflow completed successfully")
+                    # For any other output format
+                    print(f"Output: {s}")
+            except Exception as e:
+                logger.error(f"Error processing stream output: {e}")
+                print(f"Error processing output: {str(e)}")
+        if isinstance(s, dict) and "__interrupt__" in s:
+            print(f"Interrupt: {s['__interrupt__']}")
+            feedback = input("Please input your feedback: ")
+            initial_state = Command(resume=feedback)
+        else:
+            logger.info("Async workflow completed successfully")
+            break
 
 
 if __name__ == "__main__":

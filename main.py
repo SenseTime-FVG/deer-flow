@@ -4,7 +4,7 @@
 """
 Entry point script for the DeerFlow project.
 """
-
+import os
 import argparse
 import asyncio
 
@@ -12,7 +12,10 @@ from InquirerPy import inquirer
 
 from src.config.questions import BUILT_IN_QUESTIONS, BUILT_IN_QUESTIONS_ZH_CN
 from src.workflow import run_agent_workflow_async
+import logging
 
+
+logger = logging.getLogger(__name__)
 
 def ask(
     question,
@@ -114,6 +117,13 @@ def main(
 
 
 if __name__ == "__main__":
+    # key environment variables
+    key_names = ['AGENT_RECURSION_LIMIT']
+    logger.info("Important Environment variables:")
+    for k in key_names:
+        v = os.environ.get(k, None)
+        logger.info(f"{k}={v}")
+
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Run the Deer")
     parser.add_argument("--query", nargs="*", help="The query to process")
