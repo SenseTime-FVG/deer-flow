@@ -36,7 +36,7 @@ class WriterNode(BaseNode):
         }
     
     async def execute(self, state: Dict[str, Any], config: RunnableConfig) -> Command[Literal["supervisor"]]:
-        self.log_execution("Starting Coder")
+        self.log_execution("Starting Writer")
         configurable = Configuration.from_runnable_config(config)
 
         supervisor_iterate_time = state["supervisor_iterate_time"]

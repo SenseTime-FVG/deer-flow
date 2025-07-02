@@ -6,6 +6,8 @@ import logging
 import os
 from typing import Dict, List, Optional, Union
 import asyncio
+import re
+
 
 from tencentcloud.common.common_client import CommonClient
 from tencentcloud.common import credential
@@ -27,7 +29,8 @@ class SogouSearchAPIWrapper:
         secret_id: Optional[str] = None,
         secret_key: Optional[str] = None,
         endpoint: str = "tms.tencentcloudapi.com",
-        region: str = "ap-beijing"
+        region: str = "ap-guangzhou"
+
     ):
         """
         初始化搜狗搜索API包装器
@@ -36,7 +39,8 @@ class SogouSearchAPIWrapper:
             secret_id: 腾讯云访问密钥ID
             secret_key: 腾讯云访问密钥Secret  
             endpoint: API端点，默认为tms.tencentcloudapi.com
-            region: 服务区域，默认ap-beijing
+            region: 服务区域，默认ap-guangzhou
+
         """
         self.secret_id = secret_id or os.getenv("TENCENT_CLOUD_SECRET_ID")
         self.secret_key = secret_key or os.getenv("TENCENT_CLOUD_SECRET_KEY")
@@ -61,7 +65,8 @@ class SogouSearchAPIWrapper:
         # 创建公共客户端
         self.common_client = CommonClient("tms", "2020-12-29", self.cred, self.region, profile=self.client_profile)
     
-    def search(self, query: str, mode: int = 1, insite: Optional[str] = None, max_results: int = 5, **kwargs) -> Dict:
+
+    def search(self, query: str, mode: int = 2, insite: Optional[str] = None, max_results: int = 5, **kwargs) -> Dict:
         """
         同步执行搜索
         
@@ -99,7 +104,7 @@ class SogouSearchAPIWrapper:
             logger.error(error_msg)
             return {"error": f"搜索失败: {str(e)}"}
     
-    async def search_async(self, query: str, mode: int = 1, insite: Optional[str] = None, max_results: int = 5, **kwargs) -> Dict:
+    async def search_async(self, query: str, mode: int = 2, insite: Optional[str] = None, max_results: int = 5, **kwargs) -> Dict:
         """
         异步执行搜索
         
@@ -117,6 +122,16 @@ class SogouSearchAPIWrapper:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.search, query, mode, insite, max_results, **kwargs)
     
+    def filter_garbled_text(self, content):
+        """
+        过滤掉字符串中的乱码内容
+        :param search_content: 搜索返回的结果列表
+        :return: 过滤后的字符串
+        """
+        pattern = re.compile(r'[^\u4e00-\u9fa5a-zA-Z0-9\s\ufe30\uffa0-\uffa9\uff3f\uff00-\uffa0\u2000-\u206f\u3000-\u303f\ufb00-\uffa0,.?!:;\'"()\[\]{}\/<>@#$%^&*_+\-=]+')
+        filtered_text = re.sub(pattern, '', content)
+        return filtered_text
+
     def clean_results(self, raw_results: Dict) -> List[Dict[str, str]]:
         """
         清理和格式化搜索结果
@@ -145,32 +160,22 @@ class SogouSearchAPIWrapper:
                 for i, page in enumerate(pages):
                     if isinstance(page, str):
                         # 尝试解析页面内容，提取标题和链接
-                        try:                          
-                            cleaned_results.append({
-                                "title": json.loads(page).get("title", ""),
-                                "content": json.loads(page).get("content", ""),
-                                "url": json.loads(page).get("url", ""),
-                                "source": json.loads(page).get("site", ""),
-                                "score": json.loads(page).get("score", 0),
-                                "date": json.loads(page).get("date", ""),
-                            })
+                        try:
+                            if json.loads(page).get("score", 0) > 0.02:                      
+                                cleaned_results.append({
+                                    "title": self.filter_garbled_text(json.loads(page).get("title", "")),
+                                    "passage": self.filter_garbled_text(json.loads(page).get("passage", "")),
+                                    "url": json.loads(page).get("url", ""),
+                                    "domain": json.loads(page).get("site", ""),
+                                    "score": json.loads(page).get("score", 0),
+                                    "date": json.loads(page).get("date", ""),
+                                    "images": json.loads(page).get("images", []),
+                                    "type": "online_search"
+                                })
                         except Exception as e:
                             logger.warning(f"解析页面内容失败: {e}")
-                            cleaned_results.append({
-                                "title": page.split("title")[1].split("url")[0].strip(),
-                                "content": page.split("content")[1].split("site")[0].strip(),
-                                "url": page.split("url")[1].split("content")[0].strip(),
-                                "source": page.split("site")[1].split("images")[0].strip(),
-                                "score": page.split("score")[1].split("date")[0].strip(),
-                                "date": page.split("date")[1].split("title")[0].strip(),
-                            })
             else:
-                cleaned_results.append({
-                    "title": "搜索结果",
-                    "content": json.dumps(response, ensure_ascii=False, indent=2),
-                    "url": "API响应",
-                    "source": "搜狗搜索"
-                })
+                logger.warning("响应中没有Pages字段")
             
             return cleaned_results[:self.max_results]
             
@@ -207,7 +212,8 @@ if __name__ == "__main__":
             
             # 测试异步搜索
             print("\n2. 测试异步搜索:")
-            async_results = await api.search_async("DeepSeek 最新", mode=2, insite="zhihu.com")
+
+            async_results = await api.search_async("DeepSeek 最新")
             async_cleaned = api.clean_results(async_results)
             print(f"异步清理后结果: {async_cleaned}")
             

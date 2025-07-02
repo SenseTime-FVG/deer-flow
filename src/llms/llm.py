@@ -46,7 +46,6 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> ChatOpenAI:
 
     if not merged_conf:
         raise ValueError(f"Unknown LLM Conf: {llm_type}")
-
     return ChatOpenAI(**merged_conf)
 
 

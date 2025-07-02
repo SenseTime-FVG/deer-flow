@@ -35,7 +35,7 @@ class SogouSearchResults(BaseTool):
     def _run(
         self,
         query: str,
-        mode: int = 1,
+        mode: int = 2,
         insite: Optional[str] = None,
         run_manager: Optional[CallbackManagerForToolRun] = None,
         **kwargs
@@ -75,7 +75,7 @@ class SogouSearchResults(BaseTool):
     async def _arun(
         self,
         query: str,
-        mode: int = 1,
+        mode: int = 2,
         insite: Optional[str] = None,
         run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
         **kwargs
@@ -137,7 +137,7 @@ if __name__ == "__main__":
             
             # 测试异步搜索
             print("\n2. 测试异步搜索:")
-            async_results = await search_tool._arun("DeepSeek 最新", mode=2, insite="zhihu.com")
+            async_results = await search_tool._arun("IF椰子水 业务构成 市场空间")
             for i, result in enumerate(async_results):
                 print(f"第{i+1}个结果:")
                 print(result)

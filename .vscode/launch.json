@@ -10,10 +10,10 @@
             "justMyCode": true
         },
         {
-            "name": "Python: main.py",
+            "name": "uv run main.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/main.py",
+            "program": "uv run ${workspaceFolder}/main.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {

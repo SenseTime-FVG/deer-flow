@@ -131,6 +131,8 @@ class CoordinatorNode(BaseNode):
         messages = apply_prompt_template(self.name, state, configurable)
         self.log_input_message(messages)
         llm = get_llm_by_type(self.config.llm_type).bind_tools(self.tools)
+        # print(llm.__dict__)
+        # print(messages)
         response = llm.invoke(messages)
         self.log_execution(response)
         
@@ -153,22 +155,13 @@ class CoordinatorNode(BaseNode):
                     )
                 
                 elif tool_call["name"] == "web_search":
-                    from src.tools.search import get_web_search_tool, filter_garbled_text
-
-                    background_summary = "相关背景信息收集:\n"
+                    from src.tools.search import get_web_search_tool
                     search_engine = get_web_search_tool(configurable.max_search_results)
-                    try:
-                        
-                        searched_content = search_engine.invoke(tool_call["args"])
-                        for elem in searched_content:
-                            background_summary += f"- 题目：{ elem["title"]}\n- 内容：{elem["content"]}\n"
-                        
-                    except Exception as e:
-                        self.log_execution(f"Background research failed: {e}")
-                    background_summary = filter_garbled_text(background_summary)
+                    searched_content = search_engine.invoke(tool_call["args"])
+    
                     return Command(
                         update={
-                            "messages": [ToolMessage(content=background_summary, tool_call_id=tool_call["id"])],
+                            "messages": [response, ToolMessage(content=json.dumps({"search_results": searched_content}, ensure_ascii=False), tool_call_id=tool_call["id"])],
                             "tool_call_iterate_time" : iterate_times
                         },
                         goto="coordinator"
