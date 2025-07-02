@@ -6,6 +6,7 @@ import logging
 import os
 from typing import Dict, List, Optional, Union
 import asyncio
+import re
 
 from tencentcloud.common.common_client import CommonClient
 from tencentcloud.common import credential
@@ -117,6 +118,16 @@ class SogouSearchAPIWrapper:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.search, query, mode, insite, max_results, **kwargs)
     
+    def filter_garbled_text(self, content):
+        """
+        过滤掉字符串中的乱码内容
+        :param search_content: 搜索返回的结果列表
+        :return: 过滤后的字符串
+        """
+        pattern = re.compile(r'[^\u4e00-\u9fa5a-zA-Z0-9\s\ufe30\uffa0-\uffa9\uff3f\uff00-\uffa0\u2000-\u206f\u3000-\u303f\ufb00-\uffa0,.?!:;\'"()\[\]{}\/<>@#$%^&*_+\-=]+')
+        filtered_text = re.sub(pattern, '', content)
+        return filtered_text
+    
     def clean_results(self, raw_results: Dict) -> List[Dict[str, str]]:
         """
         清理和格式化搜索结果
@@ -148,12 +159,14 @@ class SogouSearchAPIWrapper:
                         try:
                             if json.loads(page).get("score", 0) > 0.02:                      
                                 cleaned_results.append({
-                                    "title": json.loads(page).get("title", ""),
-                                    "content": json.loads(page).get("passage", ""),
+                                    "title": self.filter_garbled_text(json.loads(page).get("title", "")),
+                                    "passage": self.filter_garbled_text(json.loads(page).get("passage", "")),
                                     "url": json.loads(page).get("url", ""),
-                                    "source": json.loads(page).get("site", ""),
+                                    "domain": json.loads(page).get("site", ""),
                                     "score": json.loads(page).get("score", 0),
                                     "date": json.loads(page).get("date", ""),
+                                    "images": json.loads(page).get("images", []),
+                                    "type": "online_search"
                                 })
                         except Exception as e:
                             logger.warning(f"解析页面内容失败: {e}")
