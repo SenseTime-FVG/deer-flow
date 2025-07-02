@@ -31,3 +31,4 @@ uv run main.py  --query "分析历年上海考生的北大的分数线"
 
 # uv run main.py  --query "这文件里写了什么" --file /mnt/afs/yaotiankuo/agents/data/xhx_returnData/小浣熊任务规划用户query+分类.xlsx
 # uv run main.py --query "这图中表格写了什么, 分析深层信息" --file /mnt/afs/yaotiankuo/agents/deer-flow/tests/mcp_test/image.png
+

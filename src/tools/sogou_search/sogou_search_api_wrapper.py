@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Union
 import asyncio
 import re
 
+
 from tencentcloud.common.common_client import CommonClient
 from tencentcloud.common import credential
 from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
@@ -29,6 +30,7 @@ class SogouSearchAPIWrapper:
         secret_key: Optional[str] = None,
         endpoint: str = "tms.tencentcloudapi.com",
         region: str = "ap-guangzhou"
+
     ):
         """
         初始化搜狗搜索API包装器
@@ -38,6 +40,7 @@ class SogouSearchAPIWrapper:
             secret_key: 腾讯云访问密钥Secret  
             endpoint: API端点，默认为tms.tencentcloudapi.com
             region: 服务区域，默认ap-guangzhou
+
         """
         self.secret_id = secret_id or os.getenv("TENCENT_CLOUD_SECRET_ID")
         self.secret_key = secret_key or os.getenv("TENCENT_CLOUD_SECRET_KEY")
@@ -62,6 +65,7 @@ class SogouSearchAPIWrapper:
         # 创建公共客户端
         self.common_client = CommonClient("tms", "2020-12-29", self.cred, self.region, profile=self.client_profile)
     
+
     def search(self, query: str, mode: int = 2, insite: Optional[str] = None, max_results: int = 5, **kwargs) -> Dict:
         """
         同步执行搜索
@@ -127,7 +131,7 @@ class SogouSearchAPIWrapper:
         pattern = re.compile(r'[^\u4e00-\u9fa5a-zA-Z0-9\s\ufe30\uffa0-\uffa9\uff3f\uff00-\uffa0\u2000-\u206f\u3000-\u303f\ufb00-\uffa0,.?!:;\'"()\[\]{}\/<>@#$%^&*_+\-=]+')
         filtered_text = re.sub(pattern, '', content)
         return filtered_text
-    
+
     def clean_results(self, raw_results: Dict) -> List[Dict[str, str]]:
         """
         清理和格式化搜索结果
@@ -208,6 +212,7 @@ if __name__ == "__main__":
             
             # 测试异步搜索
             print("\n2. 测试异步搜索:")
+
             async_results = await api.search_async("DeepSeek 最新")
             async_cleaned = api.clean_results(async_results)
             print(f"异步清理后结果: {async_cleaned}")

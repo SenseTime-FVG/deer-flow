@@ -54,7 +54,6 @@ def resources2user_input(resources: list[dict]) -> str:
     Returns:
         The user input string
     """
-    # resources = deepcopy(resources)
     # [{
     #     'uri': file,
     #     'title': os.path.basename(file),

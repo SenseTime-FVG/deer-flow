@@ -116,9 +116,10 @@ class BaseNode(ABC):
                         "content": ref_content
                     }
                 )
-            return references_content
+
         
     def get_action_with_dependencies_json(self, plan: Plan, target_action_id: str, resources: list[Dict]) -> str:
+
         if not any(action.id == target_action_id for goal in plan.goals for action in goal.actions):
             raise ValueError(f"Action with ID '{target_action_id}' not found in plan")
         all_action_ids = self.collect_dependencies(plan, target_action_id)
