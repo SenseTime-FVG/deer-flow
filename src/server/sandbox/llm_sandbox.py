@@ -591,7 +591,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Run LLM Sandbox MCP server")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
-    parser.add_argument("--port", type=int, default=8016, help="Port to listen on")
+    parser.add_argument("--port", type=int, default=8015, help="Port to listen on")
     parser.add_argument(
         "--sandbox_host",
         type=str,

@@ -1,0 +1,26 @@
+INFO:__main__:Starting LLM Sandbox MCP server on 0.0.0.0:8015
+INFO:__main__:Connecting to sandbox service at http://0.0.0.0:8000
+INFO:     Started server process [3276360]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8015 (Press CTRL+C to quit)
+INFO:     127.0.0.1:56530 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41922 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41928 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41936 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41940 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41942 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41952 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41954 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41956 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41960 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41970 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41202 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41214 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41220 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41226 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41228 - "GET / HTTP/1.1" 404 Not Found
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [3276360]

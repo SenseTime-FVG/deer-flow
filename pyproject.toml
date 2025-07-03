@@ -32,10 +32,13 @@ dependencies = [
     "inquirerpy>=0.3.4",
     "arxiv>=2.2.0",
     "mcp>=1.6.0",
-    "langchain-mcp-adapters>=0.0.9",
+    "langchain-mcp-adapters==0.1.0",
     "MarkItDown[all]",
     "filetype>=1.2.0",
-    "tencentcloud-sdk-python"
+    "tencentcloud-sdk-python",
+    "pytest>=8.4.0",
+    "pytest-cov>=6.1.1",
+    "pytest-asyncio>=1.0.0",
 ]
 
 [project.optional-dependencies]
