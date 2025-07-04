@@ -25,7 +25,6 @@ from typing import Tuple
 
 logger = logging.getLogger(__name__)
 
-import sandbox_fusion
 
 
 # Input schemas for SDK-based tools
@@ -746,8 +745,6 @@ def create_sandbox_toolkit(
 
     return toolkit
 
-
-toolkit = create_sandbox_toolkit()
 
 if __name__ == "__main__":
     # Example usage

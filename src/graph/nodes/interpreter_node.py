@@ -10,7 +10,7 @@ from langgraph.types import Command
 from typing import Literal, Dict, Any
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
-from src.tools.llm_sandbox.langchain_tools import toolkit
+from src.tools.llm_sandbox import LLM_SANDBOX_CLIENT
 
 
 class InterpreterNode(BaseNode):
@@ -85,29 +85,11 @@ class InterpreterNode(BaseNode):
 
         # Get bunch of sdk tools
 
-    def get_sandbox_tools(self):
-        self.sdk_tools = toolkit.get_tools()
-        self.llm_sandbox_execute_code_tool = None
-        for tool in self.sdk_tools:
-            if tool.name == "execute_python_code_sdk":
-                self.llm_sandbox_execute_code_tool = tool
-                break
-        if self.llm_sandbox_execute_code_tool is not None:
-            from langchain_core.utils.function_calling import convert_to_openai_tool
-
-            self.llm_sandbox_execute_code_tool_template = convert_to_openai_tool(
-                self.llm_sandbox_execute_code_tool
-            )
-
-        else:
-            self.llm_sandbox_execute_code_tool_template = None
-
     async def execute(
         self, state: Dict[str, Any], config: RunnableConfig
     ) -> Command[Literal["supervisor"]]:
         """执行编程逻辑"""
         self.log_execution("Starting interpreter task")
-        self.get_sandbox_tools()
 
         configurable = Configuration.from_runnable_config(config)
         supervisor_iterate_time = state["supervisor_iterate_time"]
@@ -151,7 +133,7 @@ class InterpreterNode(BaseNode):
                 elif tool_call["name"] == "execute_python_code_sdk":
                     code = tool_call["args"]["code"]
                     libraries = tool_call["args"].get("libraries", [])
-                    result = await toolkit.client.run_code(
+                    result = await LLM_SANDBOX_CLIENT.run_code(
                         code=code,
                         libraries=libraries,
                         session_id=state["llm_sandbox_session_id"],

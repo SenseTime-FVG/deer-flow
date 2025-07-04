@@ -9,7 +9,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 from typing import Literal, Dict, Any
 
-from src.tools.llm_sandbox.langchain_tools import toolkit
+from src.tools.llm_sandbox import *
 
 
 class CoderNode(BaseNode):
@@ -63,27 +63,6 @@ class CoderNode(BaseNode):
             },
         }
 
-    def get_sandbox_tools(self):
-        # Get bunch of sdk tools
-        self.sdk_tools = toolkit.get_tools()
-        self.llm_sandbox_execute_code_tool = None
-        for tool in self.sdk_tools:
-            if tool.name == "execute_python_code_sdk":
-                self.llm_sandbox_execute_code_tool = tool
-                break
-        # if self.llm_sandbox_execute_code_tool is not None:
-        #     from langchain_core.utils.function_calling import convert_to_openai_tool
-
-        #     self.llm_sandbox_execute_code_tool_template = convert_to_openai_tool(
-        #         self.llm_sandbox_execute_code_tool
-        #     )
-        #     self.log_execution("Prepared execute_python_code_sdk tool!!!")
-
-        # else:
-        #     self.llm_sandbox_execute_code_tool_template = None
-        #     self.log_earning(
-        #         "No execute_python_code_sdk tool found, using python_repl_tool instead"
-        #     )
         self.llm_sandbox_execute_code_tool_template = {
             "name": "execute_python_code_sdk",
             "description": "Use this to execute python code and do data analysis or calculation. If you want to see the output of a value, you should print it out with `print(...)`. This is visible to the user.",
@@ -105,18 +84,17 @@ class CoderNode(BaseNode):
     ) -> Command[Literal["supervisor"]]:
 
         configurable = Configuration.from_runnable_config(config)
-        self.get_sandbox_tools()
         supervisor_iterate_time = state["supervisor_iterate_time"]
         messages = apply_prompt_template("coder", state, configurable)
 
-        tools = [self.call_supervisor]
-        if self.llm_sandbox_execute_code_tool_template is not None:
-            tools.append(self.llm_sandbox_execute_code_tool_template)
-        else:
-            tools.append(self.python_repl_tool)
-            self.log_execution_warning(
-                "No execute_python_code_sdk tool found, using python_repl_tool instead"
-            )
+        tools = [self.call_supervisor, LLM_SANDBOX_EXECUTE_CODE_TOOL]
+        # if self.llm_sandbox_execute_code_tool_template is not None:
+        #     tools.append(self.llm_sandbox_execute_code_tool_template)
+        # else:
+        #     tools.append(self.python_repl_tool)
+        #     self.log_execution_warning(
+        #         "No execute_python_code_sdk tool found, using python_repl_tool instead"
+        #     )
         print("=" * 80)
         print("Registered tools: {}".format(tools))
         print("=" * 80)
@@ -134,7 +112,10 @@ class CoderNode(BaseNode):
             self.log_tool_call(response, iterate_times)
             for tool_call in response.tool_calls:
                 if tool_call["name"] == "display_result":
-                    node_res_summary += f"\n{tool_call['args']['codes']}"
+                    print("Tool call: display_result")
+                    print("=" * 80)
+                    print("Tool call:", tool_call)
+                    node_res_summary += f"\n{tool_call['args'].get('codes', '')}"
                     return Command(
                         update={
                             "messages": [
@@ -149,7 +130,7 @@ class CoderNode(BaseNode):
                 elif tool_call["name"] == "execute_python_code_sdk":
                     code = tool_call["args"]["code"]
                     libraries = tool_call["args"].get("libraries", [])
-                    result = await toolkit.client.run_code(
+                    result = await LLM_SANDBOX_CLIENT.run_code(
                         code=code,
                         libraries=libraries,
                         session_id=state["llm_sandbox_session_id"],
