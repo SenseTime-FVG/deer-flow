@@ -35,7 +35,8 @@ class ExecuteCodeSDKInput(BaseModel):
         default=None, description="Libraries to install before execution"
     )
     session_id: Optional[str] = Field(
-        description="Session ID to use. ",
+        description="Session ID to use. If not provided, the default session will be used.",
+        default=None,
     )
 
 
@@ -47,7 +48,8 @@ class ExecuteCodeWithArtifactsSDKInput(BaseModel):
         description="Libraries to install before execution"
     )
     session_id: Optional[str] = Field(
-        description="Session ID to use.",
+        description="Session ID to use. If not provided, the default session will be used.",
+        default=None,
     )
 
 
@@ -56,7 +58,8 @@ class InstallLibrariesSDKInput(BaseModel):
 
     libraries: List[str] = Field(description="List of Python library names to install")
     session_id: Optional[str] = Field(
-        description="Session ID to use.",
+        description="Session ID to use. If not provided, the default session will be used.",
+        default=None,
     )
 
 
@@ -69,7 +72,8 @@ class UploadFileSDKInput(BaseModel):
         default="utf-8", description="File encoding (utf-8 or base64 for binary)"
     )
     session_id: Optional[str] = Field(
-        description="Session ID to use.",
+        description="Session ID to use. If not provided, the default session will be used.",
+        default=None,
     )
 
 
@@ -80,7 +84,8 @@ class DownloadFileSDKInput(BaseModel):
         description="List of file paths to download from the sandbox"
     )
     session_id: Optional[str] = Field(
-        description="Session ID to use.",
+        description="Session ID to use. If not provided, the default session will be used.",
+        default=None,
     )
 
 
@@ -91,7 +96,8 @@ class ListFilesSDKInput(BaseModel):
         default="/sandbox", description="Directory path to list"
     )
     session_id: Optional[str] = Field(
-        description="Session ID to use.",
+        description="Session ID to use. If not provided, the default session will be used.",
+        default=None,
     )
 
 
@@ -100,7 +106,8 @@ class ExecuteCommandSDKInput(BaseModel):
 
     command: str = Field(description="Shell command to execute")
     session_id: Optional[str] = Field(
-        description="Session ID to use.",
+        description="Session ID to use. If not provided, the default session will be used.",
+        default=None,
     )
 
 
@@ -160,10 +167,19 @@ class LLMSandboxSDKToolkit(BaseToolkit):
 
         # Note: Auto-creation will be handled in async context
         self._auto_create_session = auto_create_session
+        if auto_create_session and not session_id:
+            # Create a default session if none provided
+            self.session_id = asyncio.run(
+                self.client.create_session(language="python")
+            ).session_id
 
     async def ahealth_check(self) -> bool:
         """Check if the sandbox server is connected in asynchrnous mode"""
         return await self.client.health_check()
+
+    def get_session_id(self) -> Optional[str]:
+        """Get the current session ID"""
+        return self.session_id
 
     def health_check(self) -> bool:
         return asyncio.run(self.health_check())
@@ -723,12 +739,13 @@ class LLMSandboxSDKListSessionsTool(LLMSandboxSDKTool):
 def create_sandbox_toolkit(
     base_url: str = "http://localhost:8000",
     http_timeout: float = 30,
+    auto_create_session: bool = True,
 ) -> Tuple[AsyncSandboxClient, LLMSandboxSDKToolkit]:
 
     toolkit = LLMSandboxSDKToolkit(
         base_url=base_url,
         session_id=None,  # No default session, will create one
-        auto_create_session=False,
+        auto_create_session=auto_create_session,
         timeout=http_timeout,
     )
 
@@ -736,6 +753,8 @@ def create_sandbox_toolkit(
 
 
 llm_sandbox_toolkit = create_sandbox_toolkit()
+llm_sandbox_session_id = llm_sandbox_toolkit.get_session_id()
+
 
 if __name__ == "__main__":
     # Example usage
