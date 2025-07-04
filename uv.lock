@@ -525,6 +525,7 @@ dependencies = [
     { name = "pytest-cov" },
     { name = "python-dotenv" },
     { name = "readabilipy" },
+    { name = "sandbox-fusion" },
     { name = "socksio" },
     { name = "sse-starlette" },
     { name = "tencentcloud-sdk-python" },
@@ -573,6 +574,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=4.1.0" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "readabilipy", specifier = ">=0.3.0" },
+    { name = "sandbox-fusion", specifier = ">=0.3.7" },
     { name = "socksio", specifier = ">=1.0.0" },
     { name = "sse-starlette", specifier = ">=1.6.5" },
     { name = "tencentcloud-sdk-python" },
@@ -2456,6 +2458,21 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fb/ab/e04bf58a8d375aeedb5268edcc835c6a660ebf79d4384d8e0889439448b0/rpds_py-0.25.1-cp313-cp313t-musllinux_1_2_x86_64.whl", hash = "sha256:58f77c60956501a4a627749a6dcb78dac522f249dd96b5c9f1c6af29bfacfb66", size = 558891, upload-time = "2025-05-21T12:44:37.358Z" },
     { url = "https://files.pythonhosted.org/packages/90/82/cb8c6028a6ef6cd2b7991e2e4ced01c854b6236ecf51e81b64b569c43d73/rpds_py-0.25.1-cp313-cp313t-win32.whl", hash = "sha256:2cb9e5b5e26fc02c8a4345048cd9998c2aca7c2712bd1b36da0c72ee969a3523", size = 218718, upload-time = "2025-05-21T12:44:38.969Z" },
     { url = "https://files.pythonhosted.org/packages/b6/97/5a4b59697111c89477d20ba8a44df9ca16b41e737fa569d5ae8bff99e650/rpds_py-0.25.1-cp313-cp313t-win_amd64.whl", hash = "sha256:401ca1c4a20cc0510d3435d89c069fe0a9ae2ee6495135ac46bdd49ec0495763", size = 232218, upload-time = "2025-05-21T12:44:40.512Z" },
+]
+
+[[package]]
+name = "sandbox-fusion"
+version = "0.3.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "pydantic" },
+    { name = "requests" },
+    { name = "tenacity" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b8/27/47b4c26b1ffec9eeb7e140f8958af789d7d5c76d4ff200dccc1f3225e92e/sandbox_fusion-0.3.7.tar.gz", hash = "sha256:57b6a96f207c624ee82afc641c75af826cab15caec189f617654f8a39132d410", size = 7096, upload-time = "2025-01-06T12:37:03.642Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/89/81/26e3e388c665f80917ac4fcb052af4e8ed306818d75a02f77d22f37930ab/sandbox_fusion-0.3.7-py3-none-any.whl", hash = "sha256:2457f91c7273973d85426b5eca2111402e7b0ecf0bf6689477e64bb1bc1bdec0", size = 9901, upload-time = "2025-01-06T12:37:01.485Z" },
 ]
 
 [[package]]

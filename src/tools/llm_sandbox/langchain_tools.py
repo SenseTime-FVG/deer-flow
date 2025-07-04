@@ -25,6 +25,8 @@ from typing import Tuple
 
 logger = logging.getLogger(__name__)
 
+import sandbox_fusion
+
 
 # Input schemas for SDK-based tools
 class ExecuteCodeSDKInput(BaseModel):
@@ -167,15 +169,15 @@ class LLMSandboxSDKToolkit(BaseToolkit):
 
         # Note: Auto-creation will be handled in async context
         self._auto_create_session = auto_create_session
-        if auto_create_session and not session_id:
-            # Create a default session if none provided
-            self.session_id = asyncio.run(
-                self.client.create_session(language="python")
-            ).session_id
 
     async def ahealth_check(self) -> bool:
         """Check if the sandbox server is connected in asynchrnous mode"""
         return await self.client.health_check()
+
+    async def create_session(self, language: str = "python") -> SessionInfo:
+        session_info = await self.client.create_session(language=language)
+        self.session_id = session_info.session_id
+        return session_info
 
     def get_session_id(self) -> Optional[str]:
         """Get the current session ID"""
@@ -238,13 +240,6 @@ class LLMSandboxSDKToolkit(BaseToolkit):
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit"""
         await self.cleanup()
-
-    def __del__(self):
-        """Destructor to ensure cleanup"""
-        try:
-            asyncio.run(self.cleanup())
-        except Exception as e:
-            logger.warning(f"Error during cleanup in __del__: {e}")
 
 
 class LLMSandboxSDKTool(BaseTool, ABC):
@@ -738,7 +733,7 @@ class LLMSandboxSDKListSessionsTool(LLMSandboxSDKTool):
 
 def create_sandbox_toolkit(
     base_url: str = "http://localhost:8000",
-    http_timeout: float = 30,
+    http_timeout: float = 120,
     auto_create_session: bool = True,
 ) -> Tuple[AsyncSandboxClient, LLMSandboxSDKToolkit]:
 
@@ -752,9 +747,7 @@ def create_sandbox_toolkit(
     return toolkit
 
 
-llm_sandbox_toolkit = create_sandbox_toolkit()
-llm_sandbox_session_id = llm_sandbox_toolkit.get_session_id()
-
+toolkit = create_sandbox_toolkit()
 
 if __name__ == "__main__":
     # Example usage

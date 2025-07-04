@@ -39,6 +39,7 @@ dependencies = [
     "pytest>=8.4.0",
     "pytest-cov>=6.1.1",
     "pytest-asyncio>=1.0.0",
+    "sandbox-fusion>=0.3.7",
 ]
 
 [project.optional-dependencies]

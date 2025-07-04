@@ -5,10 +5,12 @@ from langgraph.graph import MessagesState
 
 from src.prompts.planner_model import Plan
 from src.rag import Resource
+from src.tools.llm_sandbox.langchain_tools import LLMSandboxSDKToolkit
 
 
 class State(MessagesState):
     """State for the agent system, extends MessagesState with next field."""
+
     # 如果不在此定义即使后面有定义也不会更新，不会报错但是不会有新加的变量
     # Runtime Variables
     locale: str = "zh-CN"
@@ -25,9 +27,11 @@ class State(MessagesState):
     session_id: str = None
     session_dir: str = None
 
-    tool_call_iterate_time: int = 0 # 当前toolcall的迭代次数
-    supervisor_iterate_time: int = 0 # supervisor_iterate_time
-    history_clear: bool = False # 是否清空
+    tool_call_iterate_time: int = 0  # 当前toolcall的迭代次数
+    supervisor_iterate_time: int = 0  # supervisor_iterate_time
+    history_clear: bool = False  # 是否清空
 
     file_info: str
     need_image: str = "true"
+
+    llm_sandbox_session_id: str = ""

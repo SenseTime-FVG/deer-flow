@@ -40,21 +40,35 @@ class AsyncSandboxClient(BaseClient):
 
     async def __aenter__(self):
         """Async context manager entry"""
-        await self._ensure_session()
+        # await self._ensure_session()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit"""
         await self.close()
 
-    async def _ensure_session(self):
-        """Ensure we have an aiohttp session"""
-        if self._session is None or self._session.closed:
-            timeout = aiohttp.ClientTimeout(total=self.timeout)
-            self._session = aiohttp.ClientSession(
-                timeout=timeout, headers=self._headers
-            )
-            self._owned_session = True
+    # async def _ensure_session(self):
+    #     """Ensure we have an aiohttp session"""
+    #     if self._session is None or self._session.closed:
+    #         timeout = aiohttp.ClientTimeout(
+    #             total=self.timeout, connect=10, sock_read=30
+    #         )
+    #         connector = aiohttp.TCPConnector(
+    #             limit=100,
+    #             limit_per_host=30,
+    #             ttl_dns_cache=300,
+    #             use_dns_cache=True,
+    #             keepalive_timeout=120,
+    #             enable_cleanup_closed=True,
+    #         )
+    #         self._session = aiohttp.ClientSession(
+    #             connector=connector,
+    #             timeout=timeout,
+    #             headers=self._headers,
+    #             raise_for_status=False,
+    #         )
+
+    #         self._owned_session = True
 
     async def close(self):
         """Close the HTTP session"""
@@ -65,20 +79,22 @@ class AsyncSandboxClient(BaseClient):
 
     async def _request(self, method: str, endpoint: str, **kwargs) -> dict:
         """Make an HTTP request"""
-        await self._ensure_session()
+        # await self._ensure_session()
 
         url = f"{self.base_url}{endpoint}"
 
         try:
-            async with self._session.request(method, url, **kwargs) as response:
-                response_text = await response.text()
+            client_timeout = aiohttp.ClientTimeout(total=self.timeout)
+            async with aiohttp.ClientSession(timeout=client_timeout) as session:
+                async with session.request(method, url, **kwargs) as response:
+                    response_text = await response.text()
 
-                if response.status >= 400:
-                    self._handle_error_response(response.status, response_text)
+                    if response.status >= 400:
+                        self._handle_error_response(response.status, response_text)
 
-                if response_text:
-                    return json.loads(response_text)
-                return {}
+                    if response_text:
+                        return json.loads(response_text)
+                    return {}
 
         except aiohttp.ClientError as e:
             raise NetworkError(f"Network error: {e}")

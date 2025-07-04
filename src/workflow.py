@@ -12,7 +12,6 @@ import shutil
 from langgraph.types import Command
 
 
-
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,  # Default level is INFO
@@ -29,8 +28,8 @@ logger = logging.getLogger(__name__)
 
 
 def get_init_state(
-        user_input: str | list[dict], 
-        enable_background_investigation: bool) -> str | list[dict]:
+    user_input: str | list[dict], enable_background_investigation: bool
+) -> str | list[dict]:
     """
     1. 对用户输入进行预处理以初始化状态。
     2. 创建会话目录
@@ -42,9 +41,13 @@ def get_init_state(
         经过预处理的用户输入
         用户输入可以是字符串，也可以是字典列表，每个字典包含一个 'type' 键以及 'text' 或 'file_url' 键。
     """
-    
-    session_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + str(uuid.uuid4().hex[:8])
-    session_dir = osp.join(os.environ.get('SESSION_DIR', './sessions'), session_id)
+
+    session_id = (
+        datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        + "_"
+        + str(uuid.uuid4().hex[:8])
+    )
+    session_dir = osp.join(os.environ.get("SESSION_DIR", "./sessions"), session_id)
     if not osp.exists(session_dir):
         os.makedirs(session_dir)
 
@@ -54,29 +57,36 @@ def get_init_state(
     elif isinstance(user_input, list):
         if len(user_input) == 0:
             raise ValueError("User input cannot be empty")
-        
-        user_input_text = '\n\n'.join([f['text'] for f in user_input if f['type'] == 'text'])
-        
+
+        user_input_text = "\n\n".join(
+            [f["text"] for f in user_input if f["type"] == "text"]
+        )
+
         for content in user_input:
             # copy file from file_url and save to session_dir
-            if content['type'] == 'file_url':
+            if content["type"] == "file_url":
 
-                file_url = content['file_url']['url']
+                file_url = content["file_url"]["url"]
                 file_name = osp.basename(file_url)
                 file_path = osp.join(session_dir, file_name)
                 if osp.exists(file_path):
                     # 在文件名stem上增加一个后缀, ...
                     file_name_stem = osp.splitext(file_name)[0]
-                    file_name = file_name_stem + '_' + str(uuid.uuid4().hex[:8]) + osp.splitext(file_name)[1]
+                    file_name = (
+                        file_name_stem
+                        + "_"
+                        + str(uuid.uuid4().hex[:8])
+                        + osp.splitext(file_name)[1]
+                    )
                     file_path = osp.join(session_dir, file_name)
                 shutil.copy(file_url, file_path)
-                content['file_url']['url'] = file_path
-                    
-        files = [f for f in user_input if f['type'] == 'file_url']
-        resources = [file2resource(f['file_url']['url']) for f in files]
-        
+                content["file_url"]["url"] = file_path
+
+        files = [f for f in user_input if f["type"] == "file_url"]
+        resources = [file2resource(f["file_url"]["url"]) for f in files]
+
         for res_i, resource in enumerate(resources):
-            resources[res_i]['resource_id'] = res_i
+            resources[res_i]["resource_id"] = res_i
         # resources: list[dict]
         user_input_text = resources2user_input(resources) + "\n\n" + user_input_text
 
@@ -91,10 +101,10 @@ def get_init_state(
         "enable_background_investigation": enable_background_investigation,
         "session_id": session_id,
         "session_dir": session_dir,
-
-        "supervisor_iterate_time":0,
-        "tool_call_iterate_time":0,
-        "history_clear": False
+        "supervisor_iterate_time": 0,
+        "tool_call_iterate_time": 0,
+        "history_clear": False,
+        "llm_sandbox_session_id": "",
     }
 
 
@@ -103,7 +113,7 @@ async def run_agent_workflow_async(
     user_input: str | list[dict],
     debug: bool = False,
     enable_background_investigation: bool = True,
-    stream_config: dict = {}
+    stream_config: dict = {},
 ):
     """Run the agent workflow asynchronously with the given user input.
 
@@ -125,7 +135,16 @@ async def run_agent_workflow_async(
 
     logger.info(f"Starting async workflow with user input: {user_input}")
 
+    ## Initialize sandbox session here
+    from src.tools.llm_sandbox.langchain_tools import create_sandbox_toolkit
+
+    sandbox_toolkit = create_sandbox_toolkit()
+    session_info = await sandbox_toolkit.create_session(language="python")
+    sandbox_session_id = (
+        session_info.session_id
+    )  # Extract string ID from SessionInfo object
     initial_state = get_init_state(user_input, enable_background_investigation)
+    initial_state["llm_sandbox_session_id"] = sandbox_session_id
 
     _stream_config = copy.deepcopy(stream_config)
     _stream_config["configurable"]["thread_id"] = initial_state["session_id"]
@@ -142,7 +161,7 @@ async def run_agent_workflow_async(
 
         if isinstance(s, dict) and "__interrupt__" in s:
             # print(f"Interrupt: {s['__interrupt__']}")
-            feedback = input(s['__interrupt__'][0].value + ": ")
+            feedback = input(s["__interrupt__"][0].value + ": ")
             initial_state = Command(resume=feedback)
- 
+
         logger.info("Async workflow completed successfully")

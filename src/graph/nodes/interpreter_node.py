@@ -10,10 +10,7 @@ from langgraph.types import Command
 from typing import Literal, Dict, Any
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
-from src.tools.llm_sandbox.langchain_tools import (
-    llm_sandbox_toolkit,
-    llm_sandbox_session_id,
-)
+from src.tools.llm_sandbox.langchain_tools import toolkit
 
 
 class InterpreterNode(BaseNode):
@@ -87,7 +84,9 @@ class InterpreterNode(BaseNode):
         }
 
         # Get bunch of sdk tools
-        self.sdk_tools = llm_sandbox_toolkit.get_tools()
+
+    def get_sandbox_tools(self):
+        self.sdk_tools = toolkit.get_tools()
         self.llm_sandbox_execute_code_tool = None
         for tool in self.sdk_tools:
             if tool.name == "execute_python_code_sdk":
@@ -108,6 +107,7 @@ class InterpreterNode(BaseNode):
     ) -> Command[Literal["supervisor"]]:
         """执行编程逻辑"""
         self.log_execution("Starting interpreter task")
+        self.get_sandbox_tools()
 
         configurable = Configuration.from_runnable_config(config)
         supervisor_iterate_time = state["supervisor_iterate_time"]
@@ -151,12 +151,12 @@ class InterpreterNode(BaseNode):
                 elif tool_call["name"] == "execute_python_code_sdk":
                     code = tool_call["args"]["code"]
                     libraries = tool_call["args"].get("libraries", [])
-                    result = self.llm_sandbox_execute_code_tool.run(
+                    result = await toolkit.client.run_code(
                         code=code,
                         libraries=libraries,
-                        session_id=llm_sandbox_session_id,
+                        session_id=state["llm_sandbox_session_id"],
                     )
-                    if not result["error"]:
+                    if result.return_code != 0:
                         ci_result = f"Code executed successfully:\n```python\n{code}\n```\nResult: {result}"
                         self.log_execution(ci_result)
                     else:
@@ -165,11 +165,12 @@ class InterpreterNode(BaseNode):
                     return Command(
                         update={
                             "messages": [
+                                response,
                                 ToolMessage(
                                     content=ci_result,
                                     name="interpreter",
                                     tool_call_id=tool_call["id"],
-                                )
+                                ),
                             ],
                             "tool_call_iterate_time": iterate_times,
                         },
@@ -199,11 +200,12 @@ class InterpreterNode(BaseNode):
                     return Command(
                         update={
                             "messages": [
+                                response,
                                 ToolMessage(
                                     content=ci_result,
                                     name="interpreter",
                                     tool_call_id=tool_call["id"],
-                                )
+                                ),
                             ],
                             "tool_call_iterate_time": iterate_times,
                         },
