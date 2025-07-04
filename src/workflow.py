@@ -139,7 +139,7 @@ async def run_agent_workflow_async(
     from src.tools.llm_sandbox import LLM_SANDBOX_CLIENT
 
     session_info = await LLM_SANDBOX_CLIENT.create_session(
-        language="python", timeout=6000
+        language="python", timeout=600  # 10min timeout autoclean set-up
     )
     sandbox_session_id = (
         session_info.session_id
