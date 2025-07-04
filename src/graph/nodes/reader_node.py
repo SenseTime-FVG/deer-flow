@@ -1,79 +1,66 @@
 # nodes/reader_node.py
 """阅读器节点"""
 
-from .base_node import BaseNode
-from src.config.agents import AgentConfiguration
-from src.config.configuration import Configuration
-from src.prompts.template import apply_prompt_template
-from src.llms.llm import get_llm_by_type
+import base64
+import io
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
-from typing import Literal, Dict, Any
-import base64
-import io
 import os
-import uuid
-import logging
 from PIL import Image
+from src.config.configuration import Configuration
+from src.graph.nodes.base_node import BaseNode
+from src.prompts.template import apply_prompt_template
+from typing import Literal, Dict, Any
+import uuid
 
-logger = logging.getLogger(__name__)
 
 class ReaderNode(BaseNode):
     """阅读器节点 - 处理图像理解任务"""
     
-    def __init__(self, toolmanager):
-        super().__init__("reader", AgentConfiguration.NODE_CONFIGS["reader"], toolmanager)
-        self.call_supervisor = {
-            "name": "display_result",
-            "description": "This function used to display your result to user and Supervisor.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "result": {
-                        "type": "string",
-                        "description": "A comprehensive markdown-formatted text content, including the generated or processed text organized in a readable format."
-                    }
-                },
-                "required": [
-                "result"
-                ]
+    def __init__(self, model, tool_manager):
+        redirect_tools = [
+            {
+                "name": "display_result",
+                "description": "This function used to display your result to user and Supervisor.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "result": {
+                            "type": "string",
+                            "description": "A comprehensive markdown-formatted text content, including the generated or processed text organized in a readable format."
+                        }
+                    },
+                    "required": ["result"]
+                }
             }
-        }
+        ]
+        super().__init__(
+            "reader", model.bind_tools(redirect_tools), tool_manager)
 
-    async def execute(self, state: Dict[str, Any], config: RunnableConfig) -> Command[Literal["supervisor"]]:
+    def __call__(self, state: Dict[str, Any], config: RunnableConfig) -> Command[Literal["supervisor"]]:
+
         configurable = Configuration.from_runnable_config(config)
-        input_messages = state.get("messages")
-        supervisor_iterate_time = state["supervisor_iterate_time"]
-
-        # 构建writer输入
-        writer_state = {
-            "messages": input_messages[-supervisor_iterate_time - 1:],
-            "locale": state.get("locale", "en-US"),
-            "resources": state.get("resources", [])
-        }
-        messages = apply_prompt_template("writer", writer_state, configurable)
-        # print(messages)
-        # 准备委托工具
-        tools = [self.call_supervisor]
-        
-        llm = get_llm_by_type( self.config.llm_type).bind_tools(tools)
-        response = llm.invoke(messages)
-
-        node_res_summary = ""
+        messages = apply_prompt_template(
+            self.name, state, configurable, state["current_plan"],
+            state["current_step_index"])
+        response = self.model.invoke(messages, config)
+        response.name = self.name
+        self.log_execution(response)
 
         if hasattr(response, 'tool_calls') and response.tool_calls:
-            for tool_call in response.tool_calls:
-                if tool_call["name"] == "display_result":
-                    node_res_summary += f"\n{tool_call['args']['result']}"
-                else:
-                    node_res_summary += f"\n{tool_call}"
-                    # print(node_res_summary)
-                    raise ValueError
-        
+            redirect_tool_calls = [
+                i for i in response.tool_calls if i["name"] == "display_result"
+            ]
+            response.additional_kwargs["tool_calls"] = response.tool_calls = []
+
+            if len(redirect_tool_calls) > 0:
+                response.content = redirect_tool_calls[0]["args"]["result"]
+
         return Command(
             update={
-                "messages": [HumanMessage(content=node_res_summary, name="writer")],
+                "messages": [response],
+                "supervisor_iterate_time": state.get("supervisor_iterate_time", 0) + 1,
             },
             goto="supervisor"
         )

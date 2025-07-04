@@ -1,0 +1,95 @@
+{
+    "agent": {
+        "module": "src.graph.builder",
+        "class_name": "build_graph_from_config",
+        "args": {
+            "build_args": {
+                "starter": "planner",
+                "model_dict": {
+                    "basic": {
+                        "module": "langchain_openai",
+                        "class_name": "ChatOpenAI",
+                        "args": {
+                            "base_url": "https://genaiapi.cloudsway.net/v1/ai/qzZpcuWIVRuWVmxd",
+                            "api_key": "",
+                            "model": "claude-4-sonnet",
+                            "temperature": 0.5
+                        }
+                    }
+                },
+                "tools": [
+                    {
+                        "module": "langchain_tavily",
+                        "class_name": "TavilySearch",
+                        "args": {
+                            "tavily_api_key": "",
+                            "topic": "general",
+                            "max_results": 6
+                        }
+                    },
+                    {
+                        "module": "fvg.tools",
+                        "class_name": "MakeImageMessage"
+                    },
+                    {
+                        "module": "fvg.tools",
+                        "class_name": "MarkItDown",
+                        "args": {
+                            "parser": {
+                                "module": "markitdown",
+                                "class_name": "MarkItDown"
+                            }
+                        }
+                    },
+                    {
+                        "module": "fvg.tools",
+                        "class_name": "MessageAskUserTool"
+                    },
+                    {
+                        "module": "fvg.tools",
+                        "class_name": "PythonREPLTool"
+                    }
+                ],
+                "node_tools": {
+                    "coordinator": [
+                        "tavily_search",
+                        "message_ask_user"
+                    ],
+                    "coder": [
+                        "Python_REPL"
+                    ],
+                    "interpreter": [
+                        "make_image_message",
+                        "markitdown",
+                        "Python_REPL"
+                    ],
+                    "searcher": [
+                        "make_image_message",
+                        "tavily_search"
+                    ],
+                    "receiver": [
+                        "message_ask_user"
+                    ]
+                }
+            },
+            "compile_args": {
+                "checkpointer": {
+                    "module": "langgraph.checkpoint.memory",
+                    "class_name": "MemorySaver"
+                }
+            }
+        }
+    },
+    "stream_config": {
+        "configurable": {
+            "thread_id": "main",
+            "max_plan_iterations": 1,
+            "max_step_num": 3,
+            "max_search_results": 5,
+            "max_toolcall_iterate_times": 10
+        },
+        "recursion_limit": 80
+    },
+    "messages_key": "plan_messages",
+    "input_examples": []
+}

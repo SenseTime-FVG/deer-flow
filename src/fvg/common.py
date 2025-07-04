@@ -1,9 +1,13 @@
 import importlib
 
 
-def make_object(module: str, class_name: str, args=None):
+def get_class(module: str, class_name: str):
     _module = importlib.import_module(module, package=None)
-    _class = getattr(_module, class_name)
+    return getattr(_module, class_name)
+
+
+def make_object(module: str, class_name: str, args=None):
+    _class = get_class(module, class_name)
     return _class() if args is None else _class(**args)
 
 

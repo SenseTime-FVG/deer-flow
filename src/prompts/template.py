@@ -56,10 +56,8 @@ def apply_prompt_template(
     if configurable:
         state_vars.update(dataclasses.asdict(configurable))
     state_vars.update(state)
-    try:
-        template = env.get_template(f"{prompt_name}.md")
-        system_prompt = template.render(**state_vars)
-    
-        return [SystemMessage(content=system_prompt)] + state["messages"]
-    except Exception as e:
-        raise ValueError(f"Error applying template {prompt_name}: {e}")
+
+    template = env.get_template(f"{prompt_name}.md")
+    system_prompt = template.render(**state_vars)
+
+    return SystemMessage(system_prompt)

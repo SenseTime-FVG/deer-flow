@@ -1,0 +1,17 @@
+{
+    "llm": {
+        "module": "langchain_openai",
+        "class_name": "ChatOpenAI",
+        "args": {
+            "base_url": "https://adb-1680298167147907.7.azuredatabricks.net/serving-endpoints",
+            "api_key": "",
+            "model": "databricks-claude-3-7-sonnet"
+        }
+    },
+    "list_maker": "lambda data: list(data.values())",
+    "chunk_size": 6,
+    "dump_args": {
+        "ensure_ascii": false,
+        "indent": 2
+    }
+}

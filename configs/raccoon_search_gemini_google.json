@@ -1,0 +1,51 @@
+{
+    "agent": {
+        "module": "langgraph.prebuilt",
+        "class_name": "create_react_agent",
+        "args": {
+            "model": {
+                "module": "langchain_google_genai.chat_models",
+                "class_name": "ChatGoogleGenerativeAI",
+                "args": {
+                    "model": "gemini-2.5-flash",
+                    "google_api_key": "",
+                    "temperature": 0.5
+                }
+            },
+            "tools": [
+                {
+                    "module": "langchain_google_community.search",
+                    "class_name": "GoogleSearchResults",
+                    "args": {
+                        "api_wrapper": {
+                            "module": "langchain_google_community",
+                            "class_name": "GoogleSearchAPIWrapper",
+                            "args": {
+                                "google_api_key": "",
+                                "google_cse_id": "a2f6edbcc606f4177"
+                            }
+                        }
+                    }
+                },
+                {
+                    "module": "fvg.tools",
+                    "class_name": "MakeImageMessage"
+                }
+            ],
+            "prompt": "你擅长信息检索，可以通过工具获取网络数据，并进行整理。用户的检索需求可能会包含多个方面或者不同维度，请分开独立查询。构建合适的搜索查询，一次查询以一个目标为方向设计query，同一个query用空格适当分割关键词，以提高查询精度。同一个query中的多个关键词，在搜索时是与的关系，会优先返回包含所有关键词的信息。针对不同实体的相同属性，请分开查询。\n举例：task: \"请比较北京，广州今天的温度\"， 需要使用两个独立查询：\"北京今日温度\"，\"广州今日温度\"，而不是\"北京 广州 今日温度\"。",
+            "checkpointer": {
+                "module": "langgraph.checkpoint.memory",
+                "class_name": "MemorySaver"
+            }
+        }
+    },
+    "stream_config": {
+        "configurable": {
+            "thread_id": "main"
+        },
+        "recursion_limit": 10
+    },
+    "input_examples": [
+        "比较北京和广州的今日温度"
+    ]
+}

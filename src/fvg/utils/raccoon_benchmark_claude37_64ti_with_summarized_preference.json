@@ -1,0 +1,84 @@
+{
+    "agent": {
+        "module": "langgraph.prebuilt",
+        "class_name": "create_react_agent",
+        "args": {
+            "model": {
+                "module": "langchain_openai",
+                "class_name": "ChatOpenAI",
+                "args": {
+                    "base_url": "https://adb-1680298167147907.7.azuredatabricks.net/serving-endpoints",
+                    "api_key": "",
+                    "model": "databricks-claude-3-7-sonnet",
+                    "temperature": 0.5
+                }
+            },
+            "tools": [
+                {
+                    "module": "fvg.tools.session_based_python",
+                    "class_name": "PythonREPLTool"
+                },
+                {
+                    "module": "langchain_google_community.search",
+                    "class_name": "GoogleSearchResults",
+                    "args": {
+                        "api_wrapper": {
+                            "module": "langchain_google_community",
+                            "class_name": "GoogleSearchAPIWrapper",
+                            "args": {
+                                "google_api_key": "",
+                                "google_cse_id": "a2f6edbcc606f4177",
+                                "k": 12
+                            }
+                        }
+                    }
+                }
+            ],
+            "checkpointer": {
+                "module": "langgraph.checkpoint.memory",
+                "class_name": "MemorySaver"
+            }
+        }
+    },
+    "stream_config": {
+        "recursion_limit": 40
+    },
+    "dataset_type": "64",
+    "system_message": {
+        "module": "fvg.utils.raccoon_prompts",
+        "class_name": "sys_msg_zh_v2_with_summarized_preference"
+    },
+    "index_table": {
+        "module": "pandas",
+        "class_name": "read_excel",
+        "args": {
+            "io": "D:/Workspaces/MllmAgent/Benchmark-64ti/questions.xlsx"
+        }
+    },
+    "resource_path": "D:/Workspaces/MllmAgent/Benchmark-64ti/resources",
+    "summarized_preference": "## 用户偏好总结\n\n分析Excel数据时，应先全面了解数据结构，特别是多行同名数据（如\"陕西化建\"出现在索引0、8、16）需明确其含义（如焊接量、人数、效率）。\n处理统计问题前，先确认目标列和行的含义，避免混淆相似数据。对于复杂表格，应识别数据分块结构，确定正确的数据源。\n读取文件失败时，应尝试完整路径访问，若仍失败，可基于已知信息构建简化模型进行分析。在统计分析中，明确标注数据来源和计算方法，保证结果可追溯。\n不要使用代码可视化，编程环境不支持。",
+    "scoring": {
+        "chat_model": {
+            "module": "langchain_openai.chat_models.azure",
+            "class_name": "AzureChatOpenAI",
+            "args": {
+                "azure_endpoint": "https://omnimaid.openai.azure.com/",
+                "openai_api_key": "",
+                "deployment_name": "gpt-4.1-mini",
+                "api_version": "2025-01-01-preview",
+                "temperature": 0.2
+            }
+        },
+        "answer_table": {
+            "module": "pandas",
+            "class_name": "read_excel",
+            "args": {
+                "io": "D:/Workspaces/MllmAgent/Benchmark-64ti/result/raccoon_benchmark_claude37_64ti_with_summarized_preference_0701.answers.xlsx"
+            }
+        },
+        "thread_pool": {
+            "max_workers": 2
+        },
+        "score": 54.7
+    }
+}

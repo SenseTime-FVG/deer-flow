@@ -30,3 +30,4 @@ Today: {{ CURRENT_TIME }}
 4. 任务结果反馈
 - 任务状态为complete或超过最大交互次数时，调用complete工具，通知任务完成。
 - 否则调用advise工具，给出优化建议。`
+- 如果多次advise仍不能正确解决问题，调用replan工具，告知planner原因以修改计划。

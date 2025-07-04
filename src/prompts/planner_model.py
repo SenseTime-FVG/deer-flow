@@ -44,7 +44,7 @@ class Action(BaseModel):
     details: str = Field(default="", description="Additional details, but don't limit specific tools for sub-models")
     references: List[str] = Field(default_factory=list, description="Reference IDs")
     status: TaskStatus = Field(default=TaskStatus.PENDING, description="Action status")
-    execution_res: Optional[str] = Field(default=None, description="Action execution result")
+    result: Optional[str] = Field(default=None, description="Action execution result")
 
 
 class Goal(BaseModel):

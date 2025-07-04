@@ -1,120 +1,118 @@
-from .base_node import BaseNode
-from src.config.agents import AgentConfiguration
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+import aiohttp
+import json
+from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
-from typing import Literal, Dict, Any, List, Tuple
 import os
+import random
 import re
-import json
-import uuid
-import aiohttp
 from src.config.configuration import Configuration
+from src.graph.nodes.base_node import BaseNode
+from src.prompts.planner_model import TaskStatus
 from src.prompts.template import apply_prompt_template
-from src.llms.llm import get_llm_by_type
+from typing import Literal, Dict, Any, List, Tuple
+import uuid
+
 
 class SearcherNode(BaseNode):
-    def __init__(self, toolmanager):
-        super().__init__("searcher", AgentConfiguration.NODE_CONFIGS["searcher"], toolmanager)
-        self.call_supervisor = {
-            "name": "display_result",
-            "description": "This function used to display your result to Supervisor.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "queries": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
+
+    def __init__(
+        self, model, tool_manager, messages_key: str = "action_message"
+    ):
+        redirect_tools = [
+            {
+                "name": "display_result",
+                "description": "This function used to display your result to Supervisor.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "queries": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "The list of search queries that were used to gather the information being summarized."
                         },
-                        "description": "The list of search queries that were used to gather the information being summarized."
+                        "result": {
+                            "type": "string",
+                            "description": "A comprehensive markdown-formatted summary of the search results, including key findings, structured information, and relevant details organized in a readable format."
+                        }
                     },
-                    "result": {
-                        "type": "string",
-                        "description": "A comprehensive markdown-formatted summary of the search results, including key findings, structured information, and relevant details organized in a readable format."
-                    }
-                },
-                "required": [
-                    "queries",
-                    "result"
-                ]
+                    "required": ["queries", "result"]
+                }
             }
-        }
+        ]
+        tools = redirect_tools + tool_manager.get_tools_for_node("searcher")
+        super().__init__(
+            "searcher", model.bind_tools(tools), tool_manager, messages_key)
+        self.redirect_tool_names = [i["name"] for i in redirect_tools]
 
-        self.webSearchTool = {
-            "name": "web_search",
-            "description": "This function acts as a search engine to retrieve a wide range of information from the web. It is capable of processing queries related to various topics and returning relevant results.This search tool's performance is limited and it only returns summary information. Therefore, it's necessary to narrow down the search scope as much as possible. For example, avoid searching for specific time periods. Note: Except for proper nouns, abbreviations, and terms, it is recommended to use Chinese for search keywords to obtain better search results.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The search query used to retrieve information from the internet. Rewrite and optimize the query based on conversation history for best search quality.The keywords should not exceed four."
-                    }
-                },
-                "required": [
-                    "query"
-                ]
-            }
-        }
+    def __call__(self, state: Dict[str, Any], config: RunnableConfig) -> Command[Literal["supervisor"]]:
 
-    async def execute(self, state: Dict[str, Any], config: RunnableConfig) -> Command[Literal["supervisor"]]:
-        
         configurable = Configuration.from_runnable_config(config)
-        supervisor_iterate_time = state["supervisor_iterate_time"]
-
-        messages = apply_prompt_template(self.name, state, configurable)
-        # 准备委托工具
-        tools = [self.call_supervisor, self.webSearchTool]
+        messages = [apply_prompt_template(self.name, state, configurable)] + \
+            state[self.messages_key]
         self.log_input_message(messages)
-        llm = get_llm_by_type( self.config.llm_type).bind_tools(tools)
-        response = llm.invoke(messages)
+        response = self.model.invoke(messages, config)
+        response.name = self.name
 
-        node_res_summary = ""
+        # default to display_result
+        if not (hasattr(response, "tool_calls") and response.tool_calls):
+            response.tool_calls = [{
+                "name": "display_result",
+                "args": {"queries": [], "result": response.content},
+                "id": "toolu_vrtx_{}".format(random.randint(0, 2 ** 24)),
+                "type": "tool_call"
+            }]
 
-        max_toolcall_iterate_times = configurable.max_toolcall_iterate_times
-        iterate_times = state.get("tool_call_iterate_time", 0)
-        if hasattr(response, 'tool_calls') and response.tool_calls \
-            and iterate_times < max_toolcall_iterate_times:
-            iterate_times += 1
-            self.log_tool_call(response, iterate_times)
-
-            for tool_call in response.tool_calls:
-                # 返回给supervisor
-                if tool_call["name"] == "display_result":
-                    node_res_summary += f"\n{tool_call['args']['result']}"
-                    return Command(
-                        update={
-                            "messages": [HumanMessage(content=node_res_summary, name="writer")],
-                            "supervisor_iterate_time": supervisor_iterate_time + 1,
-                            "tool_call_iterate_time" : 0
-                        },
-                        goto="supervisor"
-                    )
-                elif tool_call["name"] == "web_search":
-                    from src.tools.search import get_web_search_tool
-
-                    search_engine = get_web_search_tool(configurable.max_search_results)
-                    searched_content = search_engine.invoke(tool_call["args"])
-
-                    return Command(
-                        update={
-                            "messages": [response, ToolMessage(content=json.dumps({"search_results": searched_content}, ensure_ascii=False), tool_call_id=tool_call["id"])],
-                            "tool_call_iterate_time" : iterate_times
-                        },
-                        goto="searcher"
-                    )
-                else:
-                    pass
-        return Command(
-            update={
-                "messages": response,
-                "supervisor_iterate_time": supervisor_iterate_time + 1
-            },
-            goto="supervisor"
+        # either multiple regular tool calls or single redirect tool call
+        redirect_tool_calls = [
+            i for i in response.tool_calls
+            if i["name"] in self.redirect_tool_names
+        ]
+        assert len(redirect_tool_calls) == 0 or (
+            len(redirect_tool_calls) == 1 and len(response.tool_calls) == 1
         )
 
-    
+        action = self.get_action(
+            state["current_plan"], state["current_step_index"])
+        action.status = TaskStatus.PROCESSING
+
+        if len(redirect_tool_calls) > 0:
+            # action is done and ready for review
+            message_to_supervisor = "{}\n{}".format(
+                self.get_action_with_dependencies_json(
+                    state["current_plan"], state["current_step_index"],
+                    state.get("resources", [])),
+                redirect_tool_calls[0]["args"]["result"]
+            )
+            return Command(
+                update={
+                    self.messages_key: [response],
+                    "supervisor_message": [
+                        HumanMessage(message_to_supervisor, name=self.name)
+                    ],
+                    "default_action_messages": {
+                        action.id.lower(): {
+                            self.messages_key: messages + [response]
+                        },
+                    },
+                    "supervisor_iterate_time": state.get("supervisor_iterate_time", 0) + 1,
+                    "tool_call_iterate_time": 0
+                },
+                goto="supervisor"
+            )
+        elif len(response.tool_calls) > 0:
+            # trigger the tool call
+            tool_call_iterate_time = state.get("tool_call_iterate_time", 0)
+            return Command(
+                update={
+                    self.messages_key: [response],
+                    "tool_call_iterate_time": tool_call_iterate_time + 1
+                },
+                goto="{}_tools".format(self.name)
+            )
+
     def _extract_markdown_images(self, text: str) -> List[Tuple[str, str]]:
         """提取 Markdown 格式图像的描述和 URL"""
         if not text:

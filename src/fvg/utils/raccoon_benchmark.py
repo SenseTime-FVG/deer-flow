@@ -1,7 +1,7 @@
 import argparse
 import asyncio
+import fvg.common
 from fvg.messages.utils import convert_to_openai_messages
-import fvg.utils.raccoon_prompts
 import fvg.utils.raccoon_tablelib
 import importlib
 import json
@@ -11,26 +11,18 @@ import threading
 import time
 
 
-TEMPLATES = {
-    'v1': fvg.utils.raccoon_prompts.template_zh_v1,
-}
-SYS_MSGS = {
-    'v1': fvg.utils.raccoon_prompts.sys_msg_zh,
-    'v2': fvg.utils.raccoon_prompts.sys_msg_zh_v2,
-    'v2_vis': fvg.utils.raccoon_prompts.sys_msg_zh_v2_vis,
-    'sys_msg_zh_yyb2': fvg.utils.raccoon_prompts.sys_msg_zh_yyb2
-}
-
-
 class ExcelAgentRunner:
-    def __init__(self, args):
-        self.args = args
-        self.template = TEMPLATES[args.template_version]
-        self.sys_msg = SYS_MSGS[args.sys_version]
+    default_system_message_config = {
+        'module': 'fvg.utils.raccoon_prompts',
+        'class_name': 'sys_msg_zh_v2'
+    }
+    default_task_message_config = {
+        'module': 'fvg.utils.raccoon_prompts',
+        'class_name': 'template_zh_v1'
+    }
+
+    def __init__(self):
         self.message_dict = {}
-        if os.path.exists(args.message_path):
-            with open(args.message_path, 'r', encoding='utf-8') as f:
-                self.message_dict = json.load(f)
 
     async def process_row(self, thread_local, config, index, row, sem):
         if not hasattr(thread_local, 'agent'):
@@ -50,8 +42,19 @@ class ExcelAgentRunner:
                 'task_prompt': row['question'],
                 'info2': info2
             }
-            task = self.template.format_map(entry)
-            sys_msg = self.sys_msg.format_map(entry)
+            if 'summarized_preference' in config:
+                entry['summarized_preference'] = config['summarized_preference']
+
+            system_message_template = fvg.common.get_class(
+                **config.get(
+                    'system_message',
+                    ExcelAgentRunner.default_system_message_config))
+            task_message_template = fvg.common.get_class(
+                **config.get(
+                    'task_message',
+                    ExcelAgentRunner.default_task_message_config))
+            system_message = system_message_template.format_map(entry)
+            task = task_message_template.format_map(entry)
 
         try:
             async with sem:
@@ -59,7 +62,7 @@ class ExcelAgentRunner:
                 response = await thread_local.agent.ainvoke(
                     {
                         'messages': [
-                            {'role': 'system', 'content': sys_msg},
+                            {'role': 'system', 'content': system_message},
                             {'role': 'user', 'content': task}
                         ]
                     },
@@ -137,8 +140,6 @@ def create_parser():
     parser.add_argument(
         '-m', '--message-path', type=str, required=True,
         help='The path to save the messages in JSON format.')
-    parser.add_argument('--template-version', type=str, default='v1')
-    parser.add_argument('--sys-version', type=str, default='v2')
     return parser
 
 
@@ -186,7 +187,7 @@ if __name__ == '__main__':
     with open(args.config_path, 'r', encoding='utf-8') as f:
         config = json.load(f)
 
-    runner = ExcelAgentRunner(args)
+    runner = ExcelAgentRunner()
     t1 = time.time()
     runner.run(config, args.output_path, args.message_path)
     print('Elapsed time: {:.2f} s'.format(time.time() - t1))

@@ -2,16 +2,12 @@
 
 from datetime import datetime
 import json
-from src.config.agents import AgentConfiguration
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Set, Union
-from langchain_core.messages import AIMessage, HumanMessage
-from langchain_core.runnables import RunnableConfig
-from langgraph.types import Command
+from abc import ABC
+from typing import Dict, List, Optional, Set
 import logging
-from src.config.agents import NodeConfig
 from src.graph.tools.tool_manager import ToolManager
-from src.prompts.planner_model import Plan, Action, Goal, TaskStatus
+from src.prompts.planner_model import Plan, Action, Goal
+
 
 log_filename = datetime.now().strftime("logs/log_%Y-%m-%d_%H-%M.log")
 logging.basicConfig(
@@ -24,35 +20,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 class BaseNode(ABC):
     """节点基类"""
     
-    def __init__(self, name: str, config: 'NodeConfig', tools_manager: 'ToolManager'):
+    def __init__(
+        self, name: str, model, tool_manager: ToolManager,
+        messages_key: str = "messages",
+    ):
         # self.log_execution("Starting analysis")    
         self.name = name
-        self.config = config
-        self.tools_manager = tools_manager
+        self.model = model
+        self.tool_manager = tool_manager
+        self.messages_key = messages_key
         self.iteration_count = 0
         self.call_params = {} # function call 到当前节点需要传入的参数
 
-    @abstractmethod
-    async def execute(self, state: Dict[str, Any], config: RunnableConfig) -> Command:
-        """执行节点逻辑"""
-        pass
-
-    # Utility functions
-    def update_plan_action_status(self,
-        plan: Plan,
-        action_id: str,
-        new_status: TaskStatus,
-        execution_res: Optional[str] = None
-    ) -> Plan:
-
-        for goal in plan.goals:
-            for action in goal.actions:
-                if action.id == action_id:
-                    action.status = new_status
-                    action.execution_res = execution_res
 
     def get_next_action(self, plan: Plan, step_index: str) -> Optional[Action]:
         found = False
@@ -140,7 +123,7 @@ class BaseNode(ABC):
                             "references": self.get_references(action.references, resources) if action.id==target_action_id else action.references,
                             "details": action.details,
                             "status": action.status.value,
-                            **({"result": action.execution_res} if action.execution_res is not None else {})
+                            "result": action.result
                         }
                         for action in goal_actions
                     ]

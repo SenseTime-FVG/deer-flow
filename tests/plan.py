@@ -45,7 +45,7 @@ class Action(BaseModel):
     details: str = Field(default="", description="Additional details, but don't limit specific tools for sub-models")
     references: List[str] = Field(default_factory=list, description="Reference IDs")
     status: TaskStatus = Field(default=TaskStatus.PENDING, description="Action status")
-    execution_res: Optional[str] = Field(default=None, description="Action execution result")
+    result: Optional[str] = Field(default=None, description="Action execution result")
 
 
 class Goal(BaseModel):
@@ -151,8 +151,8 @@ class PlanActionExtractor:
                 }
                 
                 # 如果有执行结果，添加到字典中
-                if action.execution_res is not None:
-                    action_dict["result"] = action.execution_res
+                if action.result is not None:
+                    action_dict["result"] = action.result
                 
                 goal_dict["actions"].append(action_dict)
             
@@ -167,19 +167,19 @@ class PlanActionExtractor:
         
         return json.dumps(result, ensure_ascii=False, separators=(',', ':'))
     
-    def update_action_status(self, action_id: str, status: TaskStatus, execution_result: str = None):
+    def update_action_status(self, action_id: str, status: TaskStatus, result: str = None):
         """
         更新action的状态和执行结果
         
         Args:
             action_id: action的ID
             status: 新的状态
-            execution_result: 执行结果（可选）
+            result: 执行结果（可选）
         """
         if action_id in self.action_map:
             self.action_map[action_id].status = status
-            if execution_result is not None:
-                self.action_map[action_id].execution_res = execution_result
+            if result is not None:
+                self.action_map[action_id].result = result
         else:
             raise ValueError(f"Action with ID '{action_id}' not found in plan")
 
@@ -203,7 +203,7 @@ def example_usage():
                         "references": [],
                         "details": "重点关注椰子水业务占比",
                         "status": "completed",
-                        "execution_res": "业务构成分析已完成"
+                        "result": "业务构成分析已完成"
                     },
                     {
                         "id": "G1-A2", 
@@ -213,7 +213,7 @@ def example_usage():
                         "references": [],
                         "details": "包含行业增长率和市占率分析",
                         "status": "completed",
-                        "execution_res": "市场分析已完成"
+                        "result": "市场分析已完成"
                     }
                 ]
             },
@@ -277,7 +277,7 @@ def example_usage():
                         "references": [],
                         "details": "包含SWOT分析和估值区间建议",
                         "status": "completed",
-                        "execution_res": "{\"result\": \"### 修订版IFBH港股投资价值综合分析报告\\n\\n#### 📌 一、SWOT分析（新增数据来源）\\n\\n**优势验证**：\\n- 椰子水业务占比95.6%（来源：IFBH招股书第42页）\\n- 市占率数据来自弗若斯特沙利文2024年《中国健康饮品市场白皮书》\\n\\n**机会测算**：\\n- 越南市场数据引用泰国农业部2024年出口报告显示（[点击查看原文](https://www.doc.gov.th)）\\n- 健康饮料赛道预测基于艾瑞咨询2025年行业展望\\n\\n#### 🔢 二、增强版估值建议\\n\\n| 可比公司       | P/E倍数 | EV/Sales |\\n|---------------|---------|----------|\\n| 统一企业中国   | 24.8x   | 3.5x     |\\n| 康师傅控股     | 27.3x   | 4.1x     |\\n| 农夫山泉（港股）| 31.2x   | 5.7x     |\\n| 燕京啤酒       | 29.5x   | 4.3x     |\\n\\n**定价逻辑修正**：\\n1. 承销商破发率影响量化：\\n   - 中信证券近三年IPO项目平均首日跌幅12.4%（港交所数据）\\n   - 药捷安康78%涨幅为特例（受益于医药创新题材）\\n   - 建议估值区间向下调整15%作为安全边际\\n\\n2. 新增敏感性分析：\\n   - 若泰国椰肉成本上涨20% → 毛利率降至32.1%\\n   - 若电商渠道增长低于预期 → 营收增速下降18%\\n\\n#### ⚠️ 三、风险提示强化\\n\\n```risk_matrix\\n| 风险类型       | 发生概率 | 影响程度 | 缓释措施                 |\\n|----------------|----------|----------|--------------------------|\\n| 供应链集中      | 70%      | ★★★★☆    | 逐步建立菲律宾/印尼采购渠道 |\\n| 港市容量限制    | 60%      | ★★★☆☆    | 同步拓展澳门及大湾区市场   |\\n| 承销商破发风险  | 30%      | ★★☆☆☆    | 建立动态发行价调整机制     |\\n```\\n\\n[修订版报告下载](sandbox:/mnt/data/ifbh_investment_report_v2.pdf)\"}"
+                        "result": "{\"result\": \"### 修订版IFBH港股投资价值综合分析报告\\n\\n#### 📌 一、SWOT分析（新增数据来源）\\n\\n**优势验证**：\\n- 椰子水业务占比95.6%（来源：IFBH招股书第42页）\\n- 市占率数据来自弗若斯特沙利文2024年《中国健康饮品市场白皮书》\\n\\n**机会测算**：\\n- 越南市场数据引用泰国农业部2024年出口报告显示（[点击查看原文](https://www.doc.gov.th)）\\n- 健康饮料赛道预测基于艾瑞咨询2025年行业展望\\n\\n#### 🔢 二、增强版估值建议\\n\\n| 可比公司       | P/E倍数 | EV/Sales |\\n|---------------|---------|----------|\\n| 统一企业中国   | 24.8x   | 3.5x     |\\n| 康师傅控股     | 27.3x   | 4.1x     |\\n| 农夫山泉（港股）| 31.2x   | 5.7x     |\\n| 燕京啤酒       | 29.5x   | 4.3x     |\\n\\n**定价逻辑修正**：\\n1. 承销商破发率影响量化：\\n   - 中信证券近三年IPO项目平均首日跌幅12.4%（港交所数据）\\n   - 药捷安康78%涨幅为特例（受益于医药创新题材）\\n   - 建议估值区间向下调整15%作为安全边际\\n\\n2. 新增敏感性分析：\\n   - 若泰国椰肉成本上涨20% → 毛利率降至32.1%\\n   - 若电商渠道增长低于预期 → 营收增速下降18%\\n\\n#### ⚠️ 三、风险提示强化\\n\\n```risk_matrix\\n| 风险类型       | 发生概率 | 影响程度 | 缓释措施                 |\\n|----------------|----------|----------|--------------------------|\\n| 供应链集中      | 70%      | ★★★★☆    | 逐步建立菲律宾/印尼采购渠道 |\\n| 港市容量限制    | 60%      | ★★★☆☆    | 同步拓展澳门及大湾区市场   |\\n| 承销商破发风险  | 30%      | ★★☆☆☆    | 建立动态发行价调整机制     |\\n```\\n\\n[修订版报告下载](sandbox:/mnt/data/ifbh_investment_report_v2.pdf)\"}"
                     },
                     {
                         "id": "G4-A2",

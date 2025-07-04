@@ -1,146 +1,195 @@
-from .base_node import BaseNode
-from src.config.agents import AgentConfiguration
-from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage
+import json
+from langchain_core.messages import HumanMessage, ToolMessage, RemoveMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
-from typing import Literal, Dict, Any
+import random
+from src.config.configuration import Configuration
+from src.graph.nodes.base_node import BaseNode
+from src.prompts.planner_model import TaskStatus
 from src.prompts.template import apply_prompt_template
-from src.prompts.planner_model import Plan, TaskStatus
-import logging
+from typing import Literal, Dict, Any
 
-logger = logging.getLogger(__name__)
 
 class SupervisorNode(BaseNode):
     """Supervisor节点 - 评估步骤完成度"""
-    
-    def __init__(self, toolmanager):
-        super().__init__("supervisor", AgentConfiguration.NODE_CONFIGS["supervisor"], toolmanager)
-        self.current_plan = None
-        self.adviseTool = {
-            "name": "advise",
-            "description": "This function is used to send advice to the action worker.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                "suggestion": {
-                    "type": "string",
-                    "description": "Identify specific issues using professional terminology, and clearly articulate the direction for improvement."
-                },
-                "score": {
-                    "type": "float",
-                    "description": "Score for the action result."
-                }
-                },
-                "required": ["suggestion", "score"]
-            }
-        }
-        self.completeTool = {
-            "name": "complete",
-            "description": "This function sends a signal to the manager to change the action status to 'complete'. This function will not get a response.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                "action_id": {
-                    "type": "string",
-                    "description": "The action ID."
-                    }
-                },
-                "required": ["action_id"]
-            }
-        }
 
-    async def execute(self, state: Dict[str, Any], config: RunnableConfig) \
-        -> Command[Literal["writer", "reporter", "searcher", "coder", "interpreter", "reader", "receiver", "__end__"]]|Dict[str, Any]:
-        """执行supervisor逻辑"""
-        self.log_execution("Supervisor step completion")
-        
-        # 导入必要的模块
-        from src.config.configuration import Configuration
-        from src.llms.llm import get_llm_by_type
-       
-        configurable = Configuration.from_runnable_config(config)
-        if not self.current_plan:
-            self.current_plan = state.get("current_plan")
-        current_step_index = state.get("current_step_index")
-        current_action = self.get_action(self.current_plan, current_step_index)
-
-        current_step_res = state["messages"][-1].content
-
-        current_task_summary = f"### action_id\n{current_step_index}\n\n### result\n{current_step_res}"
-        # self.log_execution(f"[Supervisor action summary]:\n {current_task_summary}")
-        supervisor_state = {
-            "messages": [HumanMessage(content=current_task_summary)],
-            "locale": state.get("locale", "en-US"),
-            "resources": state.get("resources", []),
-            "supervisor_iterate_time": state.get("supervisor_iterate_time", 0),
-            "max_supervisor_iterate_times": configurable.max_supervisor_iterate_times
-        }
- 
-        supervisor_input = apply_prompt_template("supervisor", supervisor_state, configurable)
-
-        tools = [self.adviseTool, self.completeTool]
-        # 使用LLM进行评估
-        llm = get_llm_by_type(self.config.llm_type).bind_tools(tools)
-        self.log_input_message(supervisor_input)
-        response = llm.invoke(supervisor_input)
-        self.log_execution(response)
-        # max_supervisor_iterate_times = configurable.max_supervisor_iterate_times
-        # 处理supervisor的决策
-        if hasattr(response, 'tool_calls') and response.tool_calls:
-            for tool_call in response.tool_calls:
-                action = tool_call.get("name")
-                
-                if action == "advise":
-                    # 打回重跑
-                    self.log_execution(f"Step {current_step_index} not complete")
-                    
-                     # 根据当前步骤类型确定要重新执行的节点
-                    retry_node = AgentConfiguration.STEP_TYPE_TO_NODE.get(
-                        current_action.type.lower(), "reporter"
-                    )
-                    suggestion = tool_call["args"]["suggestion"]
-                    score = tool_call["args"]["score"]
-                    return Command(
-                        update={
-                            "messages": [HumanMessage(content=f"Step rejected: {suggestion}. \nStep score: {score}.\nPlease retry.", name="supervisor")],
-                            "supervisor_iterate_time": state["supervisor_iterate_time"] + 1
+    def __init__(
+        self, model, tool_manager, messages_key: str = "supervisor_message"
+    ):
+        redirect_tools = [
+            {
+                "name": "advise",
+                "description": "This function is used to send advice to the action worker.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "suggestion": {
+                            "type": "string",
+                            "description": "Identify specific issues using professional terminology, and clearly articulate the direction for improvement."
                         },
-                        goto=retry_node
-                    )
-                
-                elif action == "complete":
-                    next_action = self.get_next_action(self.current_plan, current_step_index)
-                    
-                    if next_action:
-                        # 全部任务完成，汇总信息返回
-                        self.log_execution(f"Plan complete")
-                        self.update_plan_action_status(self.current_plan, current_step_index, TaskStatus.COMPLETED, current_step_res)
-                        return {"final_report": current_step_res}
+                        "score": {
+                            "type": "number",
+                            "description": "Score for the action result."
+                        }
+                    },
+                    "required": ["suggestion", "score"]
+                }
+            },
+            {
+                "name": "replan",
+                "description": "If continuing to execute the current plan based on existing information cannot resolve the user's problem, send a call signal to the function to trigger a plan update.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "reason": {
+                            "type": "string",
+                            "description": "The reason to replan."
+                        }
+                    },
+                    "required": ["reason"]
+                }
+            },
+            {
+                "name": "complete",
+                "description": "This function sends a signal to the manager to change the action status to 'complete'. This function will not get a response.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "action_id": {
+                            "type": "string",
+                            "description": "The action ID."
+                        }
+                    },
+                    "required": ["action_id"]
+                }
+            }
+        ]
+        super().__init__(
+            "supervisor", model.bind_tools(redirect_tools), tool_manager,
+            messages_key)
 
-                    else:
-                        # 任务完成继续任务
-                        self.log_execution(f"Step {current_step_index} complete")
-                        self.update_plan_action_status(self.current_plan, current_step_index, TaskStatus.COMPLETED, current_step_res)
-                        self.log_execution("supervisor plan update")
-                        # self.log_execution(self.current_plan)
-                        next_node = AgentConfiguration.STEP_TYPE_TO_NODE[next_action.type.lower()]
-                        # .get(
-                        #     next_action.type.lower(), "reporter"
-                        # )
-                        self.log_execution(f"next_node: {next_node}")
-                        self.log_execution(f"next_action: {next_action}")
-                        next_step_summary = self.get_action_with_dependencies_json(self.current_plan, next_action.id, state.get("resources", []))
-                        self.log_execution(f"next_step_summary: {next_step_summary}")
-                        return Command(
-                            update={
-                                "messages": [RemoveMessage(id="__remove_all__"), 
-                                             HumanMessage(content=next_step_summary, name="supervisor")],
-                                "current_step_index": next_action.id,  
-                                "supervisor_iterate_time": 0,
+    def __call__(self, state: Dict[str, Any], config: RunnableConfig) \
+            -> Command[Literal["writer", "reporter", "searcher", "coder", "interpreter", "reader", "receiver", "__end__"]] | Dict[str, Any]:
+        """执行supervisor逻辑"""
+
+        configurable = Configuration.from_runnable_config(config)
+        messages = [apply_prompt_template(self.name, state, configurable)] + \
+            state[self.messages_key]
+        response = self.model.invoke(messages, config)
+        response.name = self.name
+        self.log_execution(response)
+
+        # default to complete
+        if not (hasattr(response, "tool_calls") and response.tool_calls):
+            response.tool_calls = [{
+                "name": "complete",
+                "args": {"action_id": state["current_step_index"]},
+                "id": "toolu_vrtx_{}".format(random.randint(0, 2 ** 24)),
+                "type": "tool_call"
+            }]
+
+        assert len(response.tool_calls) == 1
+        redirect = response.tool_calls[0]
+        action = self.get_action(
+            state["current_plan"], state["current_step_index"])
+
+        # max_supervisor_iterate_times = configurable.max_supervisor_iterate_times
+        message_to_review = state["action_message"][-1]
+        if redirect["name"] == "advise":  # 打回重跑
+            self.log_execution(f"Step {action.id} not complete")
+            return Command(
+                update={
+                    self.messages_key: [
+                        response,
+                        ToolMessage(
+                            "", tool_call_id=response.tool_calls[0]["id"])
+                    ],
+                    "action_message": [
+                        ToolMessage(
+                            redirect["args"]["suggestion"],
+                            tool_call_id=message_to_review.tool_calls[0]["id"])
+                    ],
+                    "supervisor_iterate_time": state.get("supervisor_iterate_time", 0) + 1
+                },
+                goto=action.type.lower()
+            )
+
+        elif redirect["name"] == "replan":  # 重新规划
+            content = "{}\n# 重新规划\n根据已有信息，需要更新 plan 中 {} 以及之后的各 actions 和 goals （已经运行过的 actions 不再更改），才能更好解决用户问题。".format(
+                redirect["args"]["reason"], action.id)
+            return Command(
+                update={
+                    self.messages_key: [
+                        response,
+                        ToolMessage(
+                            "", tool_call_id=response.tool_calls[0]["id"])],
+                    "action_message": [
+                        ToolMessage(
+                            "已重新规划任务",
+                            tool_call_id=message_to_review.tool_calls[0]["id"])
+                    ],
+                    "plan_messages": [
+                        HumanMessage(content=content, name=self.name)
+                    ],
+                    "current_step_index": action.id,
+                    "supervisor_iterate_time": 0,
+                },
+                goto="planner"
+            )
+
+        elif redirect["name"] == "complete":
+            action.status = TaskStatus.COMPLETED
+            action.result = json.dumps(
+                message_to_review.tool_calls[0]["args"], ensure_ascii=False)
+            next_action = self.get_next_action(
+                state["current_plan"], state["current_step_index"])
+            if next_action is None:  # 全部任务完成，汇总信息返回
+                self.log_execution(f"Plan complete")
+                return Command(
+                    update={
+                        self.messages_key: [
+                            response,
+                            ToolMessage(
+                                "", tool_call_id=response.tool_calls[0]["id"])
+                        ],
+                        "default_action_messages": {
+                            action.id.lower(): {
+                                self.messages_key: messages + [response]
                             },
-                            goto=next_node
-                        )
-        
-        # 如果没有工具调用，直接结束流程
-        return {"final_report": current_step_res}
-        
+                        },
+                        "final_report": action.result,
+                    },
+                    goto="__end__"
+                )
+
+            else:  # 任务完成继续任务
+                self.log_execution(
+                    f"Step {action.id} completed and go to {next_action.id}")
+                message_to_action_workers = \
+                    self.get_action_with_dependencies_json(
+                        state["current_plan"], state["current_step_index"],
+                        state.get("resources", []))
+                return Command(
+                    update={
+                        self.messages_key: [
+                            response,
+                            RemoveMessage(id="__remove_all__")
+                        ],
+                        "action_message": [
+                            RemoveMessage(id="__remove_all__"),
+                            HumanMessage(
+                                message_to_action_workers, name=self.name)
+                        ],
+                        "default_action_messages": {
+                            action.id.lower(): {
+                                self.messages_key: messages + [response]
+                            },
+                        },
+                        "current_step_index": next_action.id,
+                        "supervisor_iterate_time": 0,
+                    },
+                    goto=next_action.type.lower()
+                )
+
+        else:
+            raise Exception("Incorrect redirection")
