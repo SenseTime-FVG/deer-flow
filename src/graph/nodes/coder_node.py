@@ -87,7 +87,13 @@ class CoderNode(BaseNode):
         supervisor_iterate_time = state["supervisor_iterate_time"]
         messages = apply_prompt_template("coder", state, configurable)
 
-        tools = [self.call_supervisor, LLM_SANDBOX_EXECUTE_CODE_TOOL]
+        tools = [
+            self.call_supervisor,
+            LLM_SANDBOX_EXECUTE_CODE_TOOL,
+            LLM_SANDBOX_LIST_SANDBOX_FILES_TOOL,
+            LLM_SANDBOX_EXECUTE_COMMAND_TOOL,
+            LLM_SANDBOX_INSTALL_LIBRARIES_TOOL,
+        ]
         # if self.llm_sandbox_execute_code_tool_template is not None:
         #     tools.append(self.llm_sandbox_execute_code_tool_template)
         # else:
@@ -140,6 +146,82 @@ class CoderNode(BaseNode):
                         self.log_execution(ci_result)
                     else:
                         ci_result = f"Error executing code:\n```python\n{code}\n```\nError: {result}"
+
+                    return Command(
+                        update={
+                            "messages": [
+                                response,
+                                ToolMessage(
+                                    content=ci_result,
+                                    tool_call_id=tool_call["id"],
+                                ),
+                            ],
+                            "tool_call_iterate_time": iterate_times,
+                        },
+                        goto="coder",
+                    )
+                elif tool_call["name"] == "execute_command_sdk":
+                    command = tool_call["args"]["command"]
+                    result = await LLM_SANDBOX_CLIENT.execute_command(
+                        command=command,
+                        session_id=state["llm_sandbox_session_id"],
+                    )
+                    if result.return_code == 0:
+                        ci_result = f"Command executed successfully:\n```bash\n{command}\n```\nResult: {result}"
+                        self.log_execution(ci_result)
+                    else:
+                        ci_result = f"Error executing command:\n```bash\n{command}\n```\nError: {result}"
+
+                    return Command(
+                        update={
+                            "messages": [
+                                response,
+                                ToolMessage(
+                                    content=ci_result,
+                                    tool_call_id=tool_call["id"],
+                                ),
+                            ],
+                            "tool_call_iterate_time": iterate_times,
+                        },
+                        goto="coder",
+                    )
+
+                elif tool_call["name"] == "list_sandbox_files_sdk":
+                    # List files in the sandbox directory
+                    files = await LLM_SANDBOX_CLIENT.list_files(
+                        session_id=state["llm_sandbox_session_id"]
+                    )
+                    file_list = "\n".join(files)
+                    ci_result = f"Files in sandbox:\n```\n{file_list}\n```"
+                    self.log_execution(ci_result)
+
+                    return Command(
+                        update={
+                            "messages": [
+                                response,
+                                ToolMessage(
+                                    content=ci_result,
+                                    tool_call_id=tool_call["id"],
+                                ),
+                            ],
+                            "tool_call_iterate_time": iterate_times,
+                        },
+                        goto="coder",
+                    )
+
+                elif tool_call["name"] == "install_python_libraries_sdk":
+                    libraries = tool_call["args"].get("libraries", [])
+                    result = await LLM_SANDBOX_CLIENT.install_libraries(
+                        libraries=libraries,
+                        session_id=state["llm_sandbox_session_id"],
+                    )
+                    if result.return_code == 0:
+                        ci_result = (
+                            f"Libraries installed successfully: {', '.join(libraries)}"
+                        )
+                        self.log_execution(ci_result)
+                    else:
+                        ci_result = f"Error installing libraries: {result}"
 
                     return Command(
                         update={

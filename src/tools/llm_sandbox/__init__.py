@@ -2,7 +2,7 @@ from .langchain_tools import *
 
 LLM_SANDBOX_CLIENT = AsyncSandboxClient(
     base_url="http://localhost:8000",  # sandox endpoint
-    timeout=60,  # 1 min timeout
+    timeout=6000,  # 100 min timeout
 )
 
 
@@ -111,5 +111,21 @@ LLM_SANDBOX_EXECUTE_COMMAND_TOOL = {
             "command": {"type": "string", "description": "Shell command to execute"}
         },
         "required": ["command"],
+    },
+}
+
+LLM_SANDBOX_INSTALL_LIBRARIES_TOOL = {
+    "name": "install_python_libraries_sdk",
+    "description": "Install Python libraries in the sandbox environment using SDK. Takes a list of library names and installs them using pip. Use this tool to install dependencies before running code.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "libraries": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of Python library names to install",
+            }
+        },
+        "required": ["libraries"],
     },
 }

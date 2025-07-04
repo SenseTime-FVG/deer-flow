@@ -138,7 +138,9 @@ async def run_agent_workflow_async(
     ## Initialize sandbox session here
     from src.tools.llm_sandbox import LLM_SANDBOX_CLIENT
 
-    session_info = await LLM_SANDBOX_CLIENT.create_session(language="python")
+    session_info = await LLM_SANDBOX_CLIENT.create_session(
+        language="python", timeout=6000
+    )
     sandbox_session_id = (
         session_info.session_id
     )  # Extract string ID from SessionInfo object

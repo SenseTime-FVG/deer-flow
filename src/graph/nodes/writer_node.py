@@ -13,10 +13,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class WriterNode(BaseNode):
-    
+
     def __init__(self, toolmanager):
-        super().__init__("writer", AgentConfiguration.NODE_CONFIGS["writer"], toolmanager)
+        super().__init__(
+            "writer", AgentConfiguration.NODE_CONFIGS["writer"], toolmanager
+        )
         # 输出给superviser的参数
         self.call_supervisor = {
             "name": "display_result",
@@ -26,16 +29,16 @@ class WriterNode(BaseNode):
                 "properties": {
                     "result": {
                         "type": "string",
-                        "description": "A comprehensive markdown-formatted text content, including the generated or processed text organized in a readable format."
+                        "description": "A comprehensive markdown-formatted text content, including the generated or processed text organized in a readable format.",
                     }
                 },
-                "required": [
-                "result"
-                ]
-            }
+                "required": ["result"],
+            },
         }
-    
-    async def execute(self, state: Dict[str, Any], config: RunnableConfig) -> Command[Literal["supervisor"]]:
+
+    async def execute(
+        self, state: Dict[str, Any], config: RunnableConfig
+    ) -> Command[Literal["supervisor"]]:
         self.log_execution("Starting Writer")
         configurable = Configuration.from_runnable_config(config)
 
@@ -45,26 +48,28 @@ class WriterNode(BaseNode):
         # 准备委托工具
         tools = [self.call_supervisor]
         self.log_input_message(messages)
-        llm = get_llm_by_type( self.config.llm_type).bind_tools(tools)
+        llm = get_llm_by_type(self.config.llm_type).bind_tools(tools)
         response = llm.invoke(messages)
         self.log_execution(response)
 
         node_res_summary = ""
-        if hasattr(response, 'tool_calls') and response.tool_calls:
+        if hasattr(response, "tool_calls") and response.tool_calls:
             for tool_call in response.tool_calls:
                 if tool_call["name"] == "display_result":
-                    node_res_summary += f"\n{tool_call['args']['result']}"
+                    node_res_summary += f"\n{tool_call['args'].get("result", "")}"
                 else:
                     node_res_summary += f"\n{tool_call}"
                     # print(node_res_summary)
                     raise ValueError
-        
+
             return Command(
                 update={
-                    "messages": [HumanMessage(content=node_res_summary, name="writer")],
-                    "supervisor_iterate_time": supervisor_iterate_time + 1
+                    "messages": [
+                        HumanMessage(content=node_res_summary, name="writer"),
+                    ],
+                    "supervisor_iterate_time": supervisor_iterate_time + 1,
                 },
-                goto="supervisor"
+                goto="supervisor",
             )
         else:
             self.log_execution_error("no tool call")
