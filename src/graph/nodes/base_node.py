@@ -99,25 +99,27 @@ class BaseNode(ABC):
                         self.collect_dependencies(plan, dep_id, depth, visited)
         return visited
     
-    def get_references(self, references:list, resources: list[Dict]=None):
-        if references == []:
+    def get_references(self, references:list, resources: list[Dict]):
+        if references == [] or resources == []:
             return []
         else:
-            references_ontent = []
+            references_content = []
             for ref in references:
-                if ref_content in resources[int(ref)]:
-                    ref_content = resources[int(ref)][""]
+                print(resources)
+                if "content" in resources[int(ref)]:
+                    ref_content = resources[int(ref)]["content"]
                 else:
                     ref_content = "文件过长，无法解析内容"
-                references_ontent.append(
+                references_content.append(
                     {
                         "file": resources[int(ref)]["uri"],
                         "content": ref_content
                     }
                 )
-            return references_ontent
+
         
-    def get_action_with_dependencies_json(self, plan: Plan, target_action_id: str, resources: list[Dict] = None) -> str:
+    def get_action_with_dependencies_json(self, plan: Plan, target_action_id: str, resources: list[Dict]) -> str:
+
         if not any(action.id == target_action_id for goal in plan.goals for action in goal.actions):
             raise ValueError(f"Action with ID '{target_action_id}' not found in plan")
         all_action_ids = self.collect_dependencies(plan, target_action_id)
@@ -167,11 +169,12 @@ class BaseNode(ABC):
             if item.type != "system":
                 logger.info(f"角色: {item.type}")
                 logger.info(f"内容: {item.content}")
-                if 'additional_kwargs' in item:
+                
+                if hasattr(item, 'additional_kwargs'):
                     logger.info(f"附加参数: {item.additional_kwargs}")
-                if 'response_metadata' in item:
+                if hasattr(item, 'response_metadata') in item:
                     logger.info(f"响应元数据: {item.response_metadata}")
-                logger.info("-" * 50)
+            logger.info("-" * 50)
 
     def log_tool_call(self, response: str, iterate_times: int):
         """记录node的toolcall， 默认逻辑除了planner之外都需要toolcall"""

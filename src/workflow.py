@@ -77,13 +77,12 @@ def get_init_state(
         
         for res_i, resource in enumerate(resources):
             resources[res_i]['resource_id'] = res_i
-
         # resources: list[dict]
         user_input_text = resources2user_input(resources) + "\n\n" + user_input_text
 
     else:
         raise ValueError("Invalid user input type")
-    
+
     return {
         "messages": [{"role": "user", "content": user_input_text}],
         "resources": resources,

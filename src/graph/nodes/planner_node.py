@@ -107,7 +107,7 @@ class PlannerNode(BaseNode):
                 "status": "pending|waiting|processing|completed"
             }
             """
-            summary = self.get_action_with_dependencies_json(new_plan, first_step.id)
+            summary = self.get_action_with_dependencies_json(new_plan, first_step.id, state.get("resources", []))
             next_node = AgentConfiguration.STEP_TYPE_TO_NODE[first_step.type.lower()]
 
             return Command(
