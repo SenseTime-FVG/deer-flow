@@ -105,7 +105,7 @@ class ReporterNode(BaseNode):
             self.get_action_with_dependencies_json(
                 state["current_plan"], state["current_step_index"],
                 state.get("resources", [])),
-            redirect[0]["args"]["result"]
+            redirect["args"]["result"]
         )
         return Command(
             update={

@@ -133,7 +133,7 @@ class BaseNode(ABC):
             "description": plan.description,
             "goals": result_goals
         }
-        return f"</plan>\n\n{json.dumps(result, ensure_ascii=False, separators=(',', ':'))}\n\n</plan>your task is {target_action_id}"
+        return f"<plan>\n\n{json.dumps(result, ensure_ascii=False, separators=(',', ':'))}\n\n</plan>your task is {target_action_id}"
 
     # log
     def show_current_plan(self, plan: Plan):
